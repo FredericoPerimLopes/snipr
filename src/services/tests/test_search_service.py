@@ -33,7 +33,7 @@ def mock_config():
         config.SUPPORTED_LANGUAGES = ["python", "javascript"]
         mock_settings.return_value = config
         yield config
-        
+
         # Cleanup
         import shutil
         shutil.rmtree(temp_dir, ignore_errors=True)
@@ -99,7 +99,7 @@ class TestSearchService:
         """Test code chunk embedding generation."""
         # Initialize with mock model
         search_service.model = mock_embedding_model
-        
+
         # Mock the store method to avoid database operations
         with patch.object(search_service, '_store_embeddings_batch', new=AsyncMock()) as mock_store:
             embedded_chunks = await search_service.embed_code_chunks(sample_code_chunks)
@@ -218,7 +218,7 @@ class TestSearchService:
         with patch("src.services.search_service.get_settings") as mock_settings:
             mock_settings.return_value = mock_config
             fresh_service = SearchService()
-            
+
             stats = await fresh_service.get_embeddings_stats()
 
             assert stats["total_embeddings"] == 0
@@ -233,7 +233,7 @@ class TestSearchService:
         with patch("src.services.search_service.get_settings") as mock_settings:
             mock_settings.return_value = mock_config
             fresh_service = SearchService()
-            
+
             # Create sample chunks for this test
             sample_chunks = [
                 CodeChunk(
@@ -255,7 +255,7 @@ class TestSearchService:
                     embedding=[0.2, 0.3, 0.4, 0.5, 0.6]
                 )
             ]
-            
+
             await fresh_service._store_embeddings_batch(sample_chunks)
 
             # Verify embeddings were stored

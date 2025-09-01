@@ -1,8 +1,9 @@
 {
-  "codebase_path": "/tmp/tmpcyky4zsg",
-  "total_chunks": 1,
-  "last_indexed": "2025-09-01T15:29:42",
+  "codebase_path": "/tmp/tmp592deebt",
   "file_hashes": {
-    "/tmp/tmpcyky4zsg/test.py": "252959454fb44117cbb84bd0f8bf1428fa7ce801a8d03ed79a626a14d536cbdc"
-  }
+    "/tmp/tmp592deebt/test.js": "565f64004e7be697b2ac6047370f4891b4bd0bd972905f5f6caef84c3887edf1",
+    "/tmp/tmp592deebt/test.py": "252959454fb44117cbb84bd0f8bf1428fa7ce801a8d03ed79a626a14d536cbdc"
+  },
+  "last_indexed": "2025-09-01T16:45:07",
+  "total_chunks": 2
 }
