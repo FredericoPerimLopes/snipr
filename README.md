@@ -120,6 +120,9 @@ await get_search_stats()
 # Cache directory for index storage
 INDEX_CACHE_DIR=".index_cache"
 
+# Enable/disable embedding generation
+EMBEDDING_ENABLED="true"
+
 # Enable quantized embeddings (8x memory reduction)
 ENABLE_QUANTIZATION="true"
 
@@ -130,7 +133,7 @@ MAX_FILE_SIZE_MB="5"
 EMBEDDING_MODEL="all-MiniLM-L6-v2"
 
 # Batch size for embedding generation
-BATCH_SIZE="32"
+EMBEDDING_BATCH_SIZE="32"
 ```
 
 ### Performance Tuning

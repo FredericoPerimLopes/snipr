@@ -9,6 +9,9 @@ class Config:
 
     # Embedding model configuration
     EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
+    _embedding_enabled_env = os.getenv("EMBEDDING_ENABLED", "true").lower()
+    EMBEDDING_ENABLED: bool = _embedding_enabled_env == "true"
+    EMBEDDING_BATCH_SIZE: int = int(os.getenv("EMBEDDING_BATCH_SIZE", "32"))
 
     # Search performance configuration
     MAX_FILE_SIZE_MB: int = int(os.getenv("MAX_FILE_SIZE_MB", "10"))

@@ -2,6 +2,7 @@ import json
 import logging
 import sqlite3
 import time
+from typing import Any
 
 import numpy as np
 
@@ -27,6 +28,10 @@ class SearchService:
 
     def _init_embedding_model(self) -> None:
         """Initialize sentence transformer model for embeddings."""
+        if not self.config.EMBEDDING_ENABLED:
+            logger.info("Embedding generation disabled by configuration")
+            return
+            
         if SentenceTransformer is None:
             logger.warning(
                 "sentence-transformers not available, semantic search disabled"
@@ -104,7 +109,7 @@ class SearchService:
             texts = [f"{chunk.semantic_type}: {chunk.content}" for chunk in chunks]
 
             # Generate embeddings in batches
-            batch_size = self.config.BATCH_SIZE
+            batch_size = self.config.EMBEDDING_BATCH_SIZE
             for i in range(0, len(texts), batch_size):
                 batch_texts = texts[i:i + batch_size]
                 batch_chunks = chunks[i:i + batch_size]
@@ -345,7 +350,7 @@ class SearchService:
             logger.error(f"Error in keyword search: {e}")
             return []
 
-    async def get_embeddings_stats(self) -> dict[str, any]:
+    async def get_embeddings_stats(self) -> dict[str, Any]:
         """Get statistics about stored embeddings."""
         try:
             conn = sqlite3.connect(str(self.db_path))
@@ -384,3 +389,33 @@ class SearchService:
         except Exception as e:
             logger.error(f"Error getting embeddings stats: {e}")
             return {"total_embeddings": 0, "languages": {}, "semantic_types": {}, "database_size_mb": 0}
+
+    async def remove_file_embeddings(self, file_paths: list[str]) -> None:
+        """Remove embeddings for specific files from the database."""
+        try:
+            conn = sqlite3.connect(str(self.db_path))
+
+            # Delete embeddings for specified files
+            placeholders = ",".join("?" * len(file_paths))
+            conn.execute(f"DELETE FROM embeddings WHERE file_path IN ({placeholders})", file_paths)
+
+            conn.commit()
+            conn.close()
+
+            logger.info(f"Removed embeddings for {len(file_paths)} files")
+
+        except Exception as e:
+            logger.error(f"Error removing file embeddings: {e}")
+
+    async def clear_all_embeddings(self) -> None:
+        """Clear all embeddings from the database."""
+        try:
+            conn = sqlite3.connect(str(self.db_path))
+            conn.execute("DELETE FROM embeddings")
+            conn.commit()
+            conn.close()
+
+            logger.info("Cleared all embeddings from database")
+
+        except Exception as e:
+            logger.error(f"Error clearing embeddings: {e}")

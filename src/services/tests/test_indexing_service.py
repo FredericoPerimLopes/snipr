@@ -192,7 +192,7 @@ class TestIndexingService:
         with patch("src.services.indexing_service.get_settings") as mock_settings:
             mock_settings.return_value = mock_config
             fresh_service = IndexingService()
-            
+
             status = await fresh_service.get_indexing_status(str(temp_codebase))
 
             assert not status.is_indexed
@@ -226,7 +226,7 @@ class TestIndexingService:
         # Store metadata
         await indexing_service._store_index_metadata(temp_codebase, chunks)
 
-        # Verify metadata file exists  
+        # Verify metadata file exists
         metadata_path = indexing_service.config.INDEX_CACHE_DIR / "index_metadata.json"
         assert metadata_path.exists()
 
@@ -238,3 +238,175 @@ class TestIndexingService:
         assert metadata["total_chunks"] == 1
         assert "last_indexed" in metadata
         assert "file_hashes" in metadata
+
+    @pytest.mark.asyncio
+    async def test_get_changed_files_no_previous_index(self, indexing_service, temp_codebase, mock_config):
+        """Test changed file detection with no previous index."""
+        # Ensure clean state - remove any existing metadata
+        metadata_path = indexing_service.config.INDEX_CACHE_DIR / "index_metadata.json"
+        if metadata_path.exists():
+            metadata_path.unlink()
+
+        modified, new, deleted = await indexing_service.get_changed_files(str(temp_codebase))
+
+        assert len(modified) == 0
+        assert len(new) >= 2  # test.py and test.js
+        assert len(deleted) == 0
+
+    @pytest.mark.asyncio
+    async def test_get_changed_files_with_modifications(self, indexing_service, temp_codebase, mock_config):
+        """Test changed file detection with file modifications."""
+        from ...models.indexing_models import CodeChunk
+
+        # Create initial metadata
+        chunks = [
+            CodeChunk(
+                file_path=str(temp_codebase / "test.py"),
+                content="def test(): pass",
+                start_line=1,
+                end_line=1,
+                language="python",
+                semantic_type="function_definition"
+            )
+        ]
+        await indexing_service._store_index_metadata(temp_codebase, chunks)
+
+        # Modify the test file
+        (temp_codebase / "test.py").write_text("def modified_test(): return 'changed'")
+
+        # Add new file
+        (temp_codebase / "new_file.py").write_text("def new_function(): pass")
+
+        modified, new, deleted = await indexing_service.get_changed_files(str(temp_codebase))
+
+        assert len(modified) == 1
+        assert str(temp_codebase / "test.py") in [str(f) for f in modified]
+        assert len(new) >= 1  # At least new_file.py
+        assert len(deleted) == 0
+
+    @pytest.mark.asyncio
+    async def test_incremental_indexing_no_changes(self, indexing_service, temp_codebase, mock_config):
+        """Test incremental indexing when no files have changed."""
+        from ...models.indexing_models import IndexingRequest
+
+        # Ensure clean state
+        metadata_path = indexing_service.config.INDEX_CACHE_DIR / "index_metadata.json"
+        if metadata_path.exists():
+            metadata_path.unlink()
+
+        # First index
+        request = IndexingRequest(
+            codebase_path=str(temp_codebase),
+            languages=None,
+            exclude_patterns=None
+        )
+
+        await indexing_service.index_codebase(request)
+
+        # Second index (no changes)
+        result = await indexing_service.index_codebase(request)
+
+        assert result.status == "up_to_date"
+        assert result.indexed_files == 0
+        assert result.processing_time_ms < 100  # Should be very fast
+
+    @pytest.mark.asyncio
+    async def test_incremental_indexing_with_changes(self, indexing_service, temp_codebase, mock_config):
+        """Test incremental indexing with file changes."""
+        from ...models.indexing_models import IndexingRequest
+
+        # Ensure clean state
+        metadata_path = indexing_service.config.INDEX_CACHE_DIR / "index_metadata.json"
+        if metadata_path.exists():
+            metadata_path.unlink()
+
+        # First index
+        request = IndexingRequest(
+            codebase_path=str(temp_codebase),
+            languages=None,
+            exclude_patterns=None
+        )
+
+        first_result = await indexing_service.index_codebase(request)
+        assert first_result.status == "success"
+
+        # Modify a file
+        (temp_codebase / "test.py").write_text("""
+def modified_hello_world():
+    '''Modified function.'''
+    return "Hello, Modified World!"
+
+class ModifiedCalculator:
+    def multiply(self, a: int, b: int) -> int:
+        return a * b
+""")
+
+        # Second index (with changes)
+        second_result = await indexing_service.index_codebase(request)
+
+        assert second_result.status == "success"
+        assert second_result.indexed_files == 1  # Only modified file
+        assert second_result.total_chunks > 0
+
+    @pytest.mark.asyncio
+    async def test_embedding_integration_during_indexing(self, indexing_service, temp_codebase, mock_config):
+        """Test that embeddings are generated during indexing process."""
+        from unittest.mock import AsyncMock, patch
+        from ...models.indexing_models import IndexingRequest
+        
+        # Ensure clean state
+        metadata_path = indexing_service.config.INDEX_CACHE_DIR / "index_metadata.json"
+        if metadata_path.exists():
+            metadata_path.unlink()
+        
+        # Mock SearchService embedding generation
+        with patch('src.services.search_service.SearchService') as mock_search_service_class:
+            mock_search_service = AsyncMock()
+            mock_search_service.embed_code_chunks = AsyncMock(return_value=[])
+            mock_search_service.remove_file_embeddings = AsyncMock()
+            mock_search_service_class.return_value = mock_search_service
+            
+            request = IndexingRequest(
+                codebase_path=str(temp_codebase),
+                languages=None,
+                exclude_patterns=None
+            )
+            
+            result = await indexing_service.index_codebase(request)
+            
+            # Verify embedding generation was called
+            assert result.status == "success"
+            mock_search_service.embed_code_chunks.assert_called_once()
+            # Verify chunks were passed to embedding generation
+            call_args = mock_search_service.embed_code_chunks.call_args[0][0]
+            assert len(call_args) > 0  # Should have chunks to embed
+
+    @pytest.mark.asyncio  
+    async def test_embedding_configuration_disabled(self, temp_codebase, mock_config):
+        """Test that embedding generation can be disabled via configuration."""
+        from unittest.mock import patch
+        from ...models.indexing_models import IndexingRequest
+        
+        # Mock config with embeddings disabled
+        mock_config.EMBEDDING_ENABLED = False
+        
+        with patch("src.services.indexing_service.get_settings") as mock_settings:
+            mock_settings.return_value = mock_config
+            service = IndexingService()
+            
+            # Ensure clean state
+            metadata_path = service.config.INDEX_CACHE_DIR / "index_metadata.json"
+            if metadata_path.exists():
+                metadata_path.unlink()
+            
+            request = IndexingRequest(
+                codebase_path=str(temp_codebase),
+                languages=None,
+                exclude_patterns=None
+            )
+            
+            result = await service.index_codebase(request)
+            
+            # Should still work but without embeddings
+            assert result.status == "success"
+            assert result.indexed_files >= 2
