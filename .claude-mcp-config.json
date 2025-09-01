@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "code-indexer": {
+      "command": "uv",
+      "args": ["run", "python", "-m", "src.main"],
+      "cwd": "/home/flopes/snipr",
+      "env": {
+        "INDEX_CACHE_DIR": ".index_cache",
+        "ENABLE_QUANTIZATION": "true"
+      }
+    }
+  }
+}
