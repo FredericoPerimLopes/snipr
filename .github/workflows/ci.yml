@@ -1,0 +1,150 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+      with:
+        version: "latest"
+
+    - name: Set up Python ${{ matrix.python-version }}
+      run: uv python install ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        uv sync --all-extras
+        uv add --dev pytest pytest-asyncio pytest-cov
+
+    - name: Lint with ruff
+      run: |
+        uv run ruff check src/ --output-format=github
+        uv run ruff format src/ --check
+
+    - name: Type check with mypy
+      run: uv run mypy src/ --ignore-missing-imports
+      continue-on-error: true
+
+    - name: Run tests
+      run: |
+        uv run python -m pytest src/ \
+          --cov=src \
+          --cov-report=xml \
+          --cov-report=term-missing \
+          --cov-fail-under=70 \
+          --junitxml=test-results.xml
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage.xml
+        fail_ci_if_error: false
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results-${{ matrix.python-version }}
+        path: test-results.xml
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+
+    - name: Install dependencies
+      run: uv sync
+
+    - name: Security audit
+      run: uv run pip-audit --desc --format=json --output=security-report.json
+      continue-on-error: true
+
+    - name: Upload security report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: security-report
+        path: security-report.json
+
+  performance:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+
+    - name: Install dependencies
+      run: uv sync
+
+    - name: Performance benchmark
+      run: |
+        cat > benchmark.py << 'EOF'
+        import asyncio
+        import tempfile
+        import time
+        from pathlib import Path
+        from src.models.indexing_models import IndexingRequest
+        from src.services.indexing_service import IndexingService
+
+        async def benchmark():
+            temp_dir = Path(tempfile.mkdtemp())
+            
+            # Create test files
+            for i in range(10):
+                (temp_dir / f"test_{i}.py").write_text(f"def func_{i}(): return {i}")
+            
+            service = IndexingService()
+            request = IndexingRequest(codebase_path=str(temp_dir))
+            
+            # Benchmark indexing
+            start = time.time()
+            result = await service.index_codebase(request)
+            duration = time.time() - start
+            
+            print(f"Indexed {result.indexed_files} files in {duration*1000:.1f}ms")
+            
+            # Cleanup
+            import shutil
+            shutil.rmtree(temp_dir)
+
+        asyncio.run(benchmark())
+        EOF
+        
+        uv run python benchmark.py
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+
+    - name: Build package
+      run: |
+        uv build
+        ls -la dist/
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: dist
+        path: dist/
