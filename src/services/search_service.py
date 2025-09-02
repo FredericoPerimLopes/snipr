@@ -94,6 +94,8 @@ class SearchService:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_semantic_type ON embeddings(semantic_type)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_file_path ON embeddings(file_path)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_content_hash ON embeddings(content_hash)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_function_name ON embeddings(function_name)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_class_name ON embeddings(class_name)")
 
             # Create metadata indexes
             conn.execute("CREATE INDEX IF NOT EXISTS idx_function_name ON embeddings(function_name)")
@@ -300,7 +302,6 @@ class SearchService:
                         dependencies = json.loads(row[16]) if row[16] else None
                         interfaces = json.loads(row[17]) if row[17] else None
                         decorators = json.loads(row[18]) if row[18] else None
-
                         chunk = CodeChunk(
                             file_path=row[0],
                             content=row[1],
@@ -433,7 +434,10 @@ class SearchService:
 
             # Build keyword search query
             base_query = """
-                SELECT file_path, content, start_line, end_line, language, semantic_type
+                SELECT file_path, content, start_line, end_line, language, semantic_type,
+                       function_signature, class_name, function_name, parameter_types, return_type,
+                       inheritance_chain, import_statements, docstring, complexity_score,
+                       dependencies, interfaces, decorators
                 FROM embeddings
                 WHERE content LIKE ?
             """
@@ -450,6 +454,14 @@ class SearchService:
 
             results = []
             for row in rows:
+                # Deserialize metadata
+                parameter_types = json.loads(row[9]) if row[9] else None
+                inheritance_chain = json.loads(row[11]) if row[11] else None
+                import_statements = json.loads(row[12]) if row[12] else None
+                dependencies = json.loads(row[15]) if row[15] else None
+                interfaces = json.loads(row[16]) if row[16] else None
+                decorators = json.loads(row[17]) if row[17] else None
+                
                 chunk = CodeChunk(
                     file_path=row[0],
                     content=row[1],
@@ -458,6 +470,18 @@ class SearchService:
                     language=row[4],
                     semantic_type=row[5],
                     embedding=None,
+                    function_signature=row[6],
+                    class_name=row[7],
+                    function_name=row[8],
+                    parameter_types=parameter_types,
+                    return_type=row[10],
+                    inheritance_chain=inheritance_chain,
+                    import_statements=import_statements,
+                    docstring=row[13],
+                    complexity_score=row[14],
+                    dependencies=dependencies,
+                    interfaces=interfaces,
+                    decorators=decorators,
                 )
                 results.append(chunk)
 
