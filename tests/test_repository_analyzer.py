@@ -1,16 +1,15 @@
 import pytest
-import asyncio
-from unittest.mock import Mock, AsyncMock, patch
 from pathlib import Path
+from unittest.mock import AsyncMock, Mock, patch
 
 from src.services.repository_analyzer import (
-    RepositoryAnalyzer,
-    CrossFileAnalyzer,
     ContextualReranker,
-    RepoKnowledgeGraph,
+    CrossFileAnalyzer,
     ModuleGraph,
+    RepoEdge,
+    RepoKnowledgeGraph,
     RepoNode,
-    RepoEdge
+    RepositoryAnalyzer,
 )
 from src.models.indexing_models import CodeChunk
 

@@ -1,15 +1,14 @@
 import pytest
-import asyncio
-from unittest.mock import Mock, AsyncMock, patch
 from pathlib import Path
+from unittest.mock import AsyncMock, Mock, patch
 
 from src.services.quality_metrics import (
-    SearchQualityMetrics,
+    BenchmarkQuery,
     CodeRetrievalMetrics,
     PerformanceBenchmark,
     SearchQualityDashboard,
-    BenchmarkQuery,
-    SearchQualityResult
+    SearchQualityMetrics,
+    SearchQualityResult,
 )
 from src.models.indexing_models import CodeChunk
 

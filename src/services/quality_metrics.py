@@ -448,7 +448,7 @@ class PerformanceBenchmark:
 
     async def benchmark_search_methods(
         self, 
-        search_services: Dict[str, Any],
+        search_services: dict[str, Any],
         test_queries: list[str] = None
     ) -> dict[str, Any]:
         """Compare performance across different search methods."""
@@ -592,7 +592,7 @@ class SearchQualityDashboard:
 
     async def generate_quality_report(
         self, 
-        search_services: Dict[str, Any],
+        search_services: dict[str, Any],
         output_path: str = None
     ) -> dict[str, Any]:
         """Generate comprehensive quality report."""

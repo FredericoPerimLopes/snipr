@@ -1,10 +1,9 @@
-import logging
 import json
+import logging
 import sqlite3
-from typing import Dict, List, Set, Tuple, Any, Optional
-from pathlib import Path
 from collections import defaultdict, deque
 from dataclasses import dataclass
+from pathlib import Path
 
 from ..models.indexing_models import CodeChunk
 from ..config import get_settings
@@ -18,7 +17,7 @@ class RepoNode:
     type: str  # "file", "class", "function", "module"
     name: str
     file_path: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, any]
 
 
 @dataclass
@@ -33,9 +32,9 @@ class ModuleGraph:
     """Represents module and dependency relationships."""
     
     def __init__(self):
-        self.nodes: Dict[str, RepoNode] = {}
-        self.edges: Dict[str, List[RepoEdge]] = defaultdict(list)
-        self.reverse_edges: Dict[str, List[RepoEdge]] = defaultdict(list)
+        self.nodes: dict[str, RepoNode] = {}
+        self.edges: dict[str, list[RepoEdge]] = defaultdict(list)
+        self.reverse_edges: dict[str, list[RepoEdge]] = defaultdict(list)
 
     def add_node(self, node: RepoNode) -> None:
         """Add a node to the graph."""
@@ -46,7 +45,7 @@ class ModuleGraph:
         self.edges[edge.source].append(edge)
         self.reverse_edges[edge.target].append(edge)
 
-    def get_neighbors(self, node_id: str, relationship: str = None) -> List[RepoNode]:
+    def get_neighbors(self, node_id: str, relationship: str = None) -> list[RepoNode]:
         """Get neighboring nodes with optional relationship filter."""
         neighbors = []
         
@@ -57,7 +56,7 @@ class ModuleGraph:
         
         return neighbors
 
-    def find_shortest_path(self, source: str, target: str) -> List[str]:
+    def find_shortest_path(self, source: str, target: str) -> list[str]:
         """Find shortest path between two nodes."""
         if source not in self.nodes or target not in self.nodes:
             return []
@@ -82,7 +81,7 @@ class ModuleGraph:
         
         return []
 
-    def get_neighborhood(self, entity: str, radius: int) -> Set[str]:
+    def get_neighborhood(self, entity: str, radius: int) -> set[str]:
         """Get all entities within relationship radius."""
         if entity not in self.nodes:
             return set()
@@ -192,7 +191,7 @@ class RepositoryAnalyzer:
         logger.info(f"Built module graph with {len(graph.nodes)} nodes and {sum(len(edges) for edges in graph.edges.values())} edges")
         return graph
 
-    async def _get_all_chunks(self) -> List[CodeChunk]:
+    async def _get_all_chunks(self) -> list[CodeChunk]:
         """Get all chunks from database."""
         try:
             conn = sqlite3.connect(str(self.db_path))
@@ -244,7 +243,7 @@ class RepositoryAnalyzer:
             logger.error(f"Error loading chunks: {e}")
             return []
 
-    async def _add_import_relationships(self, graph: ModuleGraph, chunks: List[CodeChunk]) -> None:
+    async def _add_import_relationships(self, graph: ModuleGraph, chunks: list[CodeChunk]) -> None:
         """Add import dependency relationships to graph."""
         for chunk in chunks:
             if not chunk.import_statements:
@@ -263,7 +262,7 @@ class RepositoryAnalyzer:
                     if target_file:
                         graph.add_edge(RepoEdge(source_file, target_file, "imports"))
 
-    async def _add_inheritance_relationships(self, graph: ModuleGraph, chunks: List[CodeChunk]) -> None:
+    async def _add_inheritance_relationships(self, graph: ModuleGraph, chunks: list[CodeChunk]) -> None:
         """Add class inheritance relationships to graph."""
         for chunk in chunks:
             if not chunk.class_name or not chunk.inheritance_chain:
@@ -278,7 +277,7 @@ class RepositoryAnalyzer:
                 if target_class:
                     graph.add_edge(RepoEdge(source_class, target_class, "inherits"))
 
-    def _parse_import_target(self, import_stmt: str, language: str) -> Optional[str]:
+    def _parse_import_target(self, import_stmt: str, language: str) -> str | None:
         """Parse import statement to extract target module."""
         try:
             if language == "python":
@@ -295,7 +294,7 @@ class RepositoryAnalyzer:
         except Exception:
             return None
 
-    def _find_file_by_module(self, graph: ModuleGraph, module_name: str) -> Optional[str]:
+    def _find_file_by_module(self, graph: ModuleGraph, module_name: str) -> str | None:
         """Find file node by module name."""
         for node_id, node in graph.nodes.items():
             if (node.type == "file" and 
@@ -303,7 +302,7 @@ class RepositoryAnalyzer:
                 return node_id
         return None
 
-    def _find_class_by_name(self, graph: ModuleGraph, class_name: str) -> Optional[str]:
+    def _find_class_by_name(self, graph: ModuleGraph, class_name: str) -> str | None:
         """Find class node by name."""
         for node_id, node in graph.nodes.items():
             if node.type == "class" and node.name == class_name:
@@ -318,7 +317,7 @@ class CrossFileAnalyzer:
         self.repo_analyzer = repository_analyzer
         self.config = get_settings()
 
-    async def find_related_code(self, chunk: CodeChunk, graph: ModuleGraph) -> List[CodeChunk]:
+    async def find_related_code(self, chunk: CodeChunk, graph: ModuleGraph) -> list[CodeChunk]:
         """Find related code across files based on relationships."""
         related_chunks = []
         
@@ -348,7 +347,7 @@ class CrossFileAnalyzer:
         
         return unique_related[:10]  # Limit to top 10 related chunks
 
-    async def _find_import_related_code(self, chunk: CodeChunk, graph: ModuleGraph) -> List[CodeChunk]:
+    async def _find_import_related_code(self, chunk: CodeChunk, graph: ModuleGraph) -> list[CodeChunk]:
         """Find code related through import dependencies."""
         related = []
         
@@ -370,7 +369,7 @@ class CrossFileAnalyzer:
         
         return related
 
-    async def _find_inheritance_related_code(self, chunk: CodeChunk, graph: ModuleGraph) -> List[CodeChunk]:
+    async def _find_inheritance_related_code(self, chunk: CodeChunk, graph: ModuleGraph) -> list[CodeChunk]:
         """Find code related through class inheritance."""
         related = []
         
@@ -390,7 +389,7 @@ class CrossFileAnalyzer:
         
         return related
 
-    async def _find_call_related_code(self, chunk: CodeChunk, graph: ModuleGraph) -> List[CodeChunk]:
+    async def _find_call_related_code(self, chunk: CodeChunk, graph: ModuleGraph) -> list[CodeChunk]:
         """Find code related through function calls."""
         related = []
         
@@ -404,7 +403,7 @@ class CrossFileAnalyzer:
         
         return related
 
-    def _extract_function_calls(self, content: str, language: str) -> List[str]:
+    def _extract_function_calls(self, content: str, language: str) -> list[str]:
         """Extract function call names from code content."""
         import re
         
@@ -432,7 +431,7 @@ class CrossFileAnalyzer:
         
         return list(set(filtered_calls))  # Remove duplicates
 
-    async def _get_chunks_from_file(self, file_path: str) -> List[CodeChunk]:
+    async def _get_chunks_from_file(self, file_path: str) -> list[CodeChunk]:
         """Get all chunks from a specific file."""
         try:
             conn = sqlite3.connect(str(self.config.VECTOR_DB_PATH))
@@ -485,7 +484,7 @@ class CrossFileAnalyzer:
             logger.error(f"Error getting chunks from file {file_path}: {e}")
             return []
 
-    async def _find_function_by_name(self, function_name: str) -> List[CodeChunk]:
+    async def _find_function_by_name(self, function_name: str) -> list[CodeChunk]:
         """Find function definitions by name."""
         try:
             conn = sqlite3.connect(str(self.config.VECTOR_DB_PATH))
@@ -539,7 +538,7 @@ class CrossFileAnalyzer:
             logger.error(f"Error finding function {function_name}: {e}")
             return []
 
-    async def get_context_chunks(self, chunk: CodeChunk, context_radius: int = 2) -> List[CodeChunk]:
+    async def get_context_chunks(self, chunk: CodeChunk, context_radius: int = 2) -> list[CodeChunk]:
         """Get surrounding context chunks from same and related files."""
         context_chunks = []
         
@@ -579,10 +578,10 @@ class ContextualReranker:
 
     async def rerank_with_repository_context(
         self, 
-        results: List[CodeChunk], 
+        results: list[CodeChunk], 
         query: str,
         current_file: str = None
-    ) -> List[CodeChunk]:
+    ) -> list[CodeChunk]:
         """Rerank results based on repository context and relationships."""
         if not results:
             return results
@@ -645,7 +644,7 @@ class ContextualReranker:
         path = graph.find_shortest_path(file1_id, file2_id)
         return len(path) - 1 if path else -1
 
-    def _calculate_import_relevance(self, import_statements: List[str], query: str) -> float:
+    def _calculate_import_relevance(self, import_statements: list[str], query: str) -> float:
         """Calculate relevance based on import patterns."""
         query_words = set(query.lower().split())
         relevance = 0.0
@@ -685,11 +684,11 @@ class RepoKnowledgeGraph:
     """Repository-wide knowledge graph for code understanding."""
     
     def __init__(self):
-        self.nodes: Dict[str, RepoNode] = {}
-        self.edges: Dict[str, RepoEdge] = {}
-        self.entity_index: Dict[str, Set[str]] = defaultdict(set)
+        self.nodes: dict[str, RepoNode] = {}
+        self.edges: dict[str, RepoEdge] = {}
+        self.entity_index: dict[str, set[str]] = defaultdict(set)
 
-    async def build_from_chunks(self, chunks: List[CodeChunk]) -> None:
+    async def build_from_chunks(self, chunks: list[CodeChunk]) -> None:
         """Build knowledge graph from code chunks."""
         logger.info("Building repository knowledge graph...")
         
@@ -744,7 +743,7 @@ class RepoKnowledgeGraph:
         
         logger.info(f"Knowledge graph built with {len(self.nodes)} entities and {len(self.edges)} relationships")
 
-    def query_entities(self, entity_type: str, name_pattern: str = None) -> List[RepoNode]:
+    def query_entities(self, entity_type: str, name_pattern: str = None) -> list[RepoNode]:
         """Query entities by type and optional name pattern."""
         matching_entities = []
         
@@ -756,7 +755,7 @@ class RepoKnowledgeGraph:
         
         return matching_entities
 
-    def get_relationships(self, entity_id: str, relationship_type: str = None) -> List[RepoEdge]:
+    def get_relationships(self, entity_id: str, relationship_type: str = None) -> list[RepoEdge]:
         """Get relationships for an entity."""
         relationships = []
         
