@@ -177,7 +177,7 @@ class SearchQualityMetrics:
         retrieved_items = set()
         relevance_scores = []
 
-        for i, chunk in enumerate(results):
+        for chunk in results:
             # Check function relevance
             if chunk.function_name:
                 retrieved_items.add(f"function:{chunk.function_name}")
@@ -227,7 +227,7 @@ class SearchQualityMetrics:
 
         # Get top-k retrieved items
         top_k_items = set()
-        for i, chunk in enumerate(results[:k]):
+        for chunk in results[:k]:
             if chunk.function_name:
                 top_k_items.add(f"function:{chunk.function_name}")
             if chunk.class_name:
@@ -245,7 +245,7 @@ class SearchQualityMetrics:
 
         # Get top-k retrieved items
         top_k_items = set()
-        for i, chunk in enumerate(results[:k]):
+        for chunk in results[:k]:
             if chunk.function_name:
                 top_k_items.add(f"function:{chunk.function_name}")
             if chunk.class_name:
@@ -268,7 +268,7 @@ class SearchQualityMetrics:
 
         average_precisions = []
 
-        for results, relevant in zip(results_list, relevant_sets):
+        for results, relevant in zip(results_list, relevant_sets, strict=False):
             if not relevant:
                 continue
 
@@ -598,7 +598,6 @@ class SearchQualityDashboard:
         """Generate comprehensive quality report."""
         quality_metrics = SearchQualityMetrics()
         performance_benchmark = PerformanceBenchmark()
-        code_metrics = CodeRetrievalMetrics()
 
         report = {
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
