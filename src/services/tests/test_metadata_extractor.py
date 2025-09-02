@@ -1,8 +1,9 @@
-import pytest
 from unittest.mock import Mock, patch
+
+import pytest
 from tree_sitter import Node
 
-from ..metadata_extractor import MetadataExtractor, ExtractedMetadata
+from ..metadata_extractor import MetadataExtractor
 
 
 class TestMetadataExtractor:
@@ -19,19 +20,19 @@ class TestMetadataExtractor:
         node.end_byte = 50
         node.start_point = (0, 0)
         node.end_point = (5, 0)
-        
+
         # Mock children for function components
         identifier_child = Mock(spec=Node)
         identifier_child.type = "identifier"
         identifier_child.start_byte = 4
         identifier_child.end_byte = 12
-        
+
         parameters_child = Mock(spec=Node)
         parameters_child.type = "parameters"
         parameters_child.start_byte = 12
         parameters_child.end_byte = 20
         parameters_child.children = []
-        
+
         node.children = [identifier_child, parameters_child]
         return node
 
@@ -39,9 +40,9 @@ class TestMetadataExtractor:
     async def test_extract_python_metadata(self, extractor, mock_python_node):
         """Test Python metadata extraction."""
         content = "def test_func(param1: str) -> bool:\n    pass"
-        
+
         metadata = await extractor.extract_all_metadata(mock_python_node, content, "python")
-        
+
         assert metadata.semantic_type == "function_definition"
         assert metadata.function_name == "test_func"
 
@@ -54,13 +55,13 @@ class TestMetadataExtractor:
                 "identifier": "calculate_sum",
                 "parameters": "(a: int, b: int)"
             }.get(child_type)
-            
+
             node = Mock(spec=Node)
             node.type = "function_definition"
             node.children = [Mock(), Mock()]  # Mock children
-            
+
             content = "def calculate_sum(a: int, b: int) -> int:\n    return a + b"
-            
+
             signature = extractor._extract_python_function_signature(node, content)
             assert "def calculate_sum" in signature
             assert "(a: int, b: int)" in signature
@@ -77,9 +78,9 @@ import numpy as np
 def main():
     pass
 """
-        
+
         imports = extractor._extract_import_statements(content, "python")
-        
+
         assert imports is not None
         assert len(imports) == 4
         assert "import os" in imports
@@ -96,9 +97,9 @@ function App() {
     return null;
 }
 """
-        
+
         imports = extractor._extract_import_statements(content, "javascript")
-        
+
         assert imports is not None
         assert len(imports) == 3
         assert any("React" in imp for imp in imports)
@@ -109,20 +110,20 @@ function App() {
         # Mock node with decision points
         node = Mock(spec=Node)
         node.type = "function_definition"
-        
+
         # Create mock children with decision points
         if_child = Mock(spec=Node)
         if_child.type = "if_statement"
         if_child.children = []
-        
+
         while_child = Mock(spec=Node)
         while_child.type = "while_statement"
         while_child.children = []
-        
+
         node.children = [if_child, while_child]
-        
+
         complexity = extractor._calculate_complexity(node)
-        
+
         # Base complexity (1) + if (1) + while (1) = 3
         assert complexity == 3
 
@@ -137,7 +138,7 @@ from typing import List
 class TestClass:
     def method1(self):
         pass
-        
+
     def method2(self):
         pass
 
@@ -147,36 +148,36 @@ def function1():
 def function2():
     pass
 """
-        
+
         with patch.object(extractor, 'parsers') as mock_parsers:
             mock_parser = Mock()
             mock_tree = Mock()
             mock_root = Mock()
-            
+
             # Mock the parsing structure
             mock_parser.parse.return_value = mock_tree
             mock_tree.root_node = mock_root
-            
+
             # Mock nodes for counting
             class_node = Mock()
             class_node.type = "class_definition"
             class_node.children = []
-            
+
             func_nodes = [Mock(), Mock()]
             for node in func_nodes:
                 node.type = "function_definition"
                 node.children = []
-            
+
             mock_root.children = [class_node] + func_nodes
-            
+
             def count_constructs(node):
                 # Simulate the counting logic
                 pass
-            
+
             mock_parsers.__getitem__.return_value = mock_parser
-            
+
             metadata = await extractor.extract_file_level_metadata("test.py", content)
-            
+
             assert metadata["language"] == "python"
             assert "imports" in metadata
             assert metadata["total_lines"] > 0
@@ -193,15 +194,15 @@ def function2():
     def test_get_node_text(self, extractor):
         """Test node text extraction."""
         content = "def test_function():\n    pass"
-        
+
         node = Mock(spec=Node)
         child = Mock(spec=Node)
         child.type = "identifier"
         child.start_byte = 4
         child.end_byte = 17
-        
+
         node.children = [child]
-        
+
         text = extractor._get_node_text(node, "identifier", content)
         assert text == "test_function"
 
@@ -213,9 +214,9 @@ import numpy as np
 from sklearn.metrics import accuracy_score
 from .local_module import helper
 """
-        
+
         dependencies = extractor._extract_dependencies(content, "python")
-        
+
         assert dependencies is not None
         assert "os" in dependencies
         assert "numpy" in dependencies
@@ -229,9 +230,9 @@ import { axios } from 'axios';
 const fs = require('fs');
 const path = require('path');
 """
-        
+
         dependencies = extractor._extract_dependencies(content, "javascript")
-        
+
         assert dependencies is not None
         assert "react" in dependencies
         assert "axios" in dependencies

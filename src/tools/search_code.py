@@ -2,9 +2,9 @@ import json
 import logging
 
 from ..models.indexing_models import SearchRequest
-from ..services.search_service import SearchService
 from ..services.hybrid_search import HybridSearchService
 from ..services.metadata_search import MetadataSearchEngine
+from ..services.search_service import SearchService
 
 logger = logging.getLogger(__name__)
 
@@ -195,18 +195,18 @@ async def get_search_stats() -> str:
 
 async def search_bm25(query: str, language: str | None = None, max_results: int = 10) -> str:
     """BM25 lexical search for exact keyword matching.
-    
+
     Args:
         query: Search query for keyword matching
         language: Filter by programming language
         max_results: Maximum number of results
-        
+
     Returns:
         JSON string with BM25 search results
     """
     try:
         results = await search_service.search_by_bm25(query, language, max_results)
-        
+
         response = {
             "status": "success",
             "results": [chunk.model_dump() for chunk in results],
@@ -215,9 +215,9 @@ async def search_bm25(query: str, language: str | None = None, max_results: int 
             "query": query,
             "message": f"Found {len(results)} BM25 matches"
         }
-        
+
         return json.dumps(response)
-        
+
     except Exception as e:
         logger.error(f"Error in BM25 search: {e}")
         return json.dumps({
@@ -229,29 +229,29 @@ async def search_bm25(query: str, language: str | None = None, max_results: int 
 
 async def search_metadata(query: str, language: str | None = None, max_results: int = 10) -> str:
     """Metadata-based search for functions, classes, and types.
-    
+
     Args:
         query: Natural language query for metadata search
         language: Filter by programming language
         max_results: Maximum number of results
-        
+
     Returns:
         JSON string with metadata search results
     """
     try:
         results = await metadata_search_engine.search(query, language, max_results)
-        
+
         response = {
-            "status": "success", 
+            "status": "success",
             "results": [chunk.model_dump() for chunk in results],
             "total_matches": len(results),
             "search_type": "metadata",
             "query": query,
             "message": f"Found {len(results)} metadata matches"
         }
-        
+
         return json.dumps(response)
-        
+
     except Exception as e:
         logger.error(f"Error in metadata search: {e}")
         return json.dumps({
@@ -263,12 +263,12 @@ async def search_metadata(query: str, language: str | None = None, max_results: 
 
 async def search_functions(function_name: str = None, return_type: str = None, language: str = None) -> str:
     """Search for functions by signature and metadata.
-    
+
     Args:
         function_name: Function name to search for
         return_type: Return type to match
         language: Programming language filter
-        
+
     Returns:
         JSON string with function search results
     """
@@ -278,7 +278,7 @@ async def search_functions(function_name: str = None, return_type: str = None, l
             return_type=return_type,
             language=language
         )
-        
+
         response = {
             "status": "success",
             "results": [chunk.model_dump() for chunk in results],
@@ -291,9 +291,9 @@ async def search_functions(function_name: str = None, return_type: str = None, l
             },
             "message": f"Found {len(results)} matching functions"
         }
-        
+
         return json.dumps(response)
-        
+
     except Exception as e:
         logger.error(f"Error in function search: {e}")
         return json.dumps({
@@ -305,12 +305,12 @@ async def search_functions(function_name: str = None, return_type: str = None, l
 
 async def search_classes(class_name: str = None, inherits_from: str = None, language: str = None) -> str:
     """Search for classes by inheritance and metadata.
-    
+
     Args:
         class_name: Class name to search for
         inherits_from: Base class name
         language: Programming language filter
-        
+
     Returns:
         JSON string with class search results
     """
@@ -320,7 +320,7 @@ async def search_classes(class_name: str = None, inherits_from: str = None, lang
             inherits_from=inherits_from,
             language=language
         )
-        
+
         response = {
             "status": "success",
             "results": [chunk.model_dump() for chunk in results],
@@ -333,9 +333,9 @@ async def search_classes(class_name: str = None, inherits_from: str = None, lang
             },
             "message": f"Found {len(results)} matching classes"
         }
-        
+
         return json.dumps(response)
-        
+
     except Exception as e:
         logger.error(f"Error in class search: {e}")
         return json.dumps({
