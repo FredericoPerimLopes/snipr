@@ -37,7 +37,7 @@ class BenchmarkQuery:
 class SearchQualityMetrics:
     """Comprehensive search quality measurement and benchmarking system."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.benchmark_queries = self._load_benchmark_queries()
 
     def _load_benchmark_queries(self) -> list[BenchmarkQuery]:
