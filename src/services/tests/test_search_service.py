@@ -27,7 +27,7 @@ def mock_config():
         temp_dir = Path(tempfile.mkdtemp())
         config.INDEX_CACHE_DIR = temp_dir
         config.VECTOR_DB_PATH = temp_dir / f"test_embeddings_{id(config)}.db"
-        config.EMBEDDING_MODEL = "all-MiniLM-L6-v2"
+        config.EMBEDDING_MODEL = "jinaai/jina-embeddings-v2-base-code"
         config.BATCH_SIZE = 10
         config.ENABLE_QUANTIZATION = True
         config.SUPPORTED_LANGUAGES = ["python", "javascript"]
@@ -36,6 +36,7 @@ def mock_config():
 
         # Cleanup
         import shutil
+
         shutil.rmtree(temp_dir, ignore_errors=True)
 
 
@@ -44,10 +45,7 @@ def mock_embedding_model():
     """Mock sentence transformer model."""
     with patch("src.services.search_service.SentenceTransformer") as mock_transformer:
         mock_model = Mock()
-        mock_model.encode.return_value = np.array([
-            [0.1, 0.2, 0.3, 0.4, 0.5],
-            [0.2, 0.3, 0.4, 0.5, 0.6]
-        ])
+        mock_model.encode.return_value = np.array([[0.1, 0.2, 0.3, 0.4, 0.5], [0.2, 0.3, 0.4, 0.5, 0.6]])
         mock_transformer.return_value = mock_model
         yield mock_model
 
@@ -63,7 +61,7 @@ def sample_code_chunks():
             end_line=2,
             language="python",
             semantic_type="function_definition",
-            embedding=[0.1, 0.2, 0.3, 0.4, 0.5]
+            embedding=[0.1, 0.2, 0.3, 0.4, 0.5],
         ),
         CodeChunk(
             file_path="/test/file2.py",
@@ -72,13 +70,12 @@ def sample_code_chunks():
             end_line=3,
             language="python",
             semantic_type="class_definition",
-            embedding=[0.2, 0.3, 0.4, 0.5, 0.6]
-        )
+            embedding=[0.2, 0.3, 0.4, 0.5, 0.6],
+        ),
     ]
 
 
 class TestSearchService:
-
     @pytest.mark.asyncio
     async def test_init_vector_db(self, mock_config):
         """Test vector database initialization."""
@@ -101,7 +98,7 @@ class TestSearchService:
         search_service.model = mock_embedding_model
 
         # Mock the store method to avoid database operations
-        with patch.object(search_service, '_store_embeddings_batch', new=AsyncMock()):
+        with patch.object(search_service, "_store_embeddings_batch", new=AsyncMock()):
             embedded_chunks = await search_service.embed_code_chunks(sample_code_chunks)
 
             assert len(embedded_chunks) == 2
@@ -126,24 +123,21 @@ class TestSearchService:
         search_service.model = mock_embedding_model
 
         # Store test embeddings in database
-        await search_service._store_embeddings_batch([
-            CodeChunk(
-                file_path="/test/file.py",
-                content="def test_function(): pass",
-                start_line=1,
-                end_line=1,
-                language="python",
-                semantic_type="function_definition",
-                embedding=[0.1, 0.2, 0.3, 0.4, 0.5]
-            )
-        ])
-
-        request = SearchRequest(
-            query="test function",
-            language=None,
-            max_results=10,
-            similarity_threshold=0.5
+        await search_service._store_embeddings_batch(
+            [
+                CodeChunk(
+                    file_path="/test/file.py",
+                    content="def test_function(): pass",
+                    start_line=1,
+                    end_line=1,
+                    language="python",
+                    semantic_type="function_definition",
+                    embedding=[0.1, 0.2, 0.3, 0.4, 0.5],
+                )
+            ]
         )
+
+        request = SearchRequest(query="test function", language=None, max_results=10, similarity_threshold=0.5)
 
         result = await search_service.search_code(request)
 
@@ -168,17 +162,23 @@ class TestSearchService:
         """Test keyword-based search fallback."""
         # Store test data in database
         conn = sqlite3.connect(str(search_service.db_path))
-        conn.execute("""
+        conn.execute(
+            """
             INSERT OR REPLACE INTO embeddings (file_path, content, start_line, end_line, language,
                                    semantic_type, embedding, content_hash)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            "/test/file_keywords.py",
-            "def hello_world(): return 'Hello'",
-            1, 1, "python", "function_definition",
-            json.dumps([0.1, 0.2, 0.3]).encode(),
-            "test_hash_keywords"
-        ))
+        """,
+            (
+                "/test/file_keywords.py",
+                "def hello_world(): return 'Hello'",
+                1,
+                1,
+                "python",
+                "function_definition",
+                json.dumps([0.1, 0.2, 0.3]).encode(),
+                "test_hash_keywords",
+            ),
+        )
         conn.commit()
         conn.close()
 
@@ -243,7 +243,7 @@ class TestSearchService:
                     end_line=2,
                     language="python",
                     semantic_type="function_definition",
-                    embedding=[0.1, 0.2, 0.3, 0.4, 0.5]
+                    embedding=[0.1, 0.2, 0.3, 0.4, 0.5],
                 ),
                 CodeChunk(
                     file_path="/test/store_batch2.py",
@@ -252,8 +252,8 @@ class TestSearchService:
                     end_line=3,
                     language="python",
                     semantic_type="class_definition",
-                    embedding=[0.2, 0.3, 0.4, 0.5, 0.6]
-                )
+                    embedding=[0.2, 0.3, 0.4, 0.5, 0.6],
+                ),
             ]
 
             await fresh_service._store_embeddings_batch(sample_chunks)
@@ -290,10 +290,7 @@ class TestSearchService:
         query_embedding = np.array([0.15, 0.25, 0.35, 0.45, 0.55])  # Similar to second chunk
 
         results = await search_service._search_similar_embeddings(
-            query_embedding,
-            language_filter=None,
-            max_results=10,
-            threshold=0.5
+            query_embedding, language_filter=None, max_results=10, threshold=0.5
         )
 
         assert len(results) >= 0  # Should find similar chunks

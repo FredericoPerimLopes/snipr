@@ -103,7 +103,7 @@ class IndexingService:
                     language=lang_name,
                     chunk_lines=15,  # Optimal chunk size for semantic coherence
                     chunk_lines_overlap=3,  # Context overlap for continuity
-                    max_chars=600  # Focused chunks for better embeddings
+                    max_chars=600,  # Focused chunks for better embeddings
                 )
                 self.code_splitters[lang_name] = splitter
                 logger.debug(f"Initialized CodeSplitter for {lang_name}")
@@ -133,7 +133,7 @@ class IndexingService:
                 total_chunks=status.total_chunks,
                 processing_time_ms=0.0,
                 languages_detected=[],
-                status="up_to_date"
+                status="up_to_date",
             )
 
         logger.info(
@@ -143,6 +143,7 @@ class IndexingService:
 
         # Import SearchService for database cleanup
         from .search_service import SearchService
+
         search_service = SearchService()
 
         # Clean up deleted and modified files from database
@@ -179,14 +180,11 @@ class IndexingService:
             total_chunks=len(all_chunks),
             processing_time_ms=processing_time,
             languages_detected=list(languages_detected),
-            status="success"
+            status="success",
         )
 
     async def _discover_source_files(
-        self,
-        codebase_path: Path,
-        languages: list[str] | None,
-        exclude_patterns: list[str]
+        self, codebase_path: Path, languages: list[str] | None, exclude_patterns: list[str]
     ) -> list[Path]:
         """Discover source files to index."""
 
@@ -208,7 +206,7 @@ class IndexingService:
             "html": [".html", ".htm"],
             "css": [".css"],
             "json": [".json"],
-            "yaml": [".yaml", ".yml"]
+            "yaml": [".yaml", ".yml"],
         }
 
         # Get target extensions
@@ -236,9 +234,11 @@ class IndexingService:
 
                 # Check file extension and size
                 max_size = self.config.MAX_FILE_SIZE_MB * 1024 * 1024
-                if (file_path.suffix in target_extensions and
-                    not self._should_exclude_path(file_path, exclude_patterns) and
-                    file_path.stat().st_size < max_size):
+                if (
+                    file_path.suffix in target_extensions
+                    and not self._should_exclude_path(file_path, exclude_patterns)
+                    and file_path.stat().st_size < max_size
+                ):
                     source_files.append(file_path)
 
         return source_files
@@ -311,13 +311,7 @@ class IndexingService:
 
         # Extract semantic chunks from AST
         chunks = []
-        await self._extract_chunks_from_node(
-            tree.root_node,
-            content,
-            str(file_path),
-            language,
-            chunks
-        )
+        await self._extract_chunks_from_node(tree.root_node, content, str(file_path), language, chunks)
         return chunks
 
     async def _get_semantic_type(self, chunk_content: str, parser: Parser, language: str) -> str:
@@ -328,12 +322,23 @@ class IndexingService:
 
             # Priority order for semantic types (higher priority = more specific)
             semantic_priority = {
-                "class_definition": 10, "class_declaration": 10, "interface_declaration": 10,
-                "function_definition": 8, "async_function_definition": 8, "function_declaration": 8,
-                "method_definition": 7, "constructor_definition": 7,
-                "struct_declaration": 6, "enum_declaration": 6, "type_alias_declaration": 6,
-                "variable_declaration": 4, "const_declaration": 4, "let_declaration": 4,
-                "import_statement": 2, "import_declaration": 2, "from_import_statement": 2
+                "class_definition": 10,
+                "class_declaration": 10,
+                "interface_declaration": 10,
+                "function_definition": 8,
+                "async_function_definition": 8,
+                "function_declaration": 8,
+                "method_definition": 7,
+                "constructor_definition": 7,
+                "struct_declaration": 6,
+                "enum_declaration": 6,
+                "type_alias_declaration": 6,
+                "variable_declaration": 4,
+                "const_declaration": 4,
+                "let_declaration": 4,
+                "import_statement": 2,
+                "import_declaration": 2,
+                "from_import_statement": 2,
             }
 
             def find_highest_priority_type(node: Node) -> tuple[str, int]:
@@ -368,12 +373,10 @@ class IndexingService:
         try:
             tree = parser.parse(text.encode())
             chunks = []
-            lines = text.split('\n')
+            lines = text.split("\n")
 
             # Extract individual semantic constructs
-            await self._extract_chunks_from_node(
-                tree.root_node, text, file_path, language, chunks
-            )
+            await self._extract_chunks_from_node(tree.root_node, text, file_path, language, chunks)
 
             # If no semantic chunks found, create a general code chunk
             if not chunks:
@@ -384,7 +387,7 @@ class IndexingService:
                     end_line=len(lines),
                     language=language,
                     semantic_type="code_block",
-                    embedding=None
+                    embedding=None,
                 )
                 chunks.append(chunk)
 
@@ -393,15 +396,17 @@ class IndexingService:
         except Exception as e:
             logger.debug(f"Error extracting semantic chunks: {e}")
             # Fallback: create single chunk
-            return [CodeChunk(
-                file_path=file_path,
-                content=text,
-                start_line=1,
-                end_line=len(text.split('\n')),
-                language=language,
-                semantic_type="code_block",
-                embedding=None
-            )]
+            return [
+                CodeChunk(
+                    file_path=file_path,
+                    content=text,
+                    start_line=1,
+                    end_line=len(text.split("\n")),
+                    language=language,
+                    semantic_type="code_block",
+                    embedding=None,
+                )
+            ]
 
     def _detect_language(self, file_path: Path) -> str:
         """Detect programming language from file extension."""
@@ -427,30 +432,36 @@ class IndexingService:
             ".css": "css",
             ".json": "json",
             ".yaml": "yaml",
-            ".yml": "yaml"
+            ".yml": "yaml",
         }
 
         return extension_map.get(file_path.suffix.lower(), "text")
 
     async def _extract_chunks_from_node(
-        self,
-        node: Node,
-        content: str,
-        file_path: str,
-        language: str,
-        chunks: list[CodeChunk]
+        self, node: Node, content: str, file_path: str, language: str, chunks: list[CodeChunk]
     ) -> None:
         """Extract semantic code chunks from Tree-sitter AST node."""
         lines = content.split("\n")
 
         # Define semantic node types to extract
         semantic_types = {
-            "function_definition", "async_function_definition", "function_declaration",
-            "class_definition", "class_declaration", "interface_declaration",
-            "method_definition", "constructor_definition",
-            "variable_declaration", "const_declaration", "let_declaration",
-            "struct_declaration", "enum_declaration", "type_alias_declaration",
-            "import_statement", "import_declaration", "from_import_statement"
+            "function_definition",
+            "async_function_definition",
+            "function_declaration",
+            "class_definition",
+            "class_declaration",
+            "interface_declaration",
+            "method_definition",
+            "constructor_definition",
+            "variable_declaration",
+            "const_declaration",
+            "let_declaration",
+            "struct_declaration",
+            "enum_declaration",
+            "type_alias_declaration",
+            "import_statement",
+            "import_declaration",
+            "from_import_statement",
         }
 
         if node.type in semantic_types:
@@ -472,26 +483,22 @@ class IndexingService:
                 end_line=context_end,
                 language=language,
                 semantic_type=node.type,
-                embedding=None  # Will be populated by SearchService
+                embedding=None,  # Will be populated by SearchService
             )
 
             chunks.append(chunk)
 
         # Recursively process child nodes
         for child in node.children:
-            await self._extract_chunks_from_node(
-                child, content, file_path, language, chunks
-            )
+            await self._extract_chunks_from_node(child, content, file_path, language, chunks)
 
-    async def _store_index_metadata(
-        self, codebase_path: Path, chunks: list[CodeChunk]
-    ) -> None:
+    async def _store_index_metadata(self, codebase_path: Path, chunks: list[CodeChunk]) -> None:
         """Store indexing metadata for incremental updates."""
         metadata = {
             "codebase_path": str(codebase_path),
             "total_chunks": len(chunks),
             "last_indexed": time.strftime("%Y-%m-%dT%H:%M:%S"),
-            "file_hashes": {}
+            "file_hashes": {},
         }
 
         # Calculate file hashes for incremental updates
@@ -521,10 +528,7 @@ class IndexingService:
             except Exception:
                 metadata = {"file_hashes": {}}
         else:
-            metadata = {
-                "codebase_path": str(codebase_path),
-                "file_hashes": {}
-            }
+            metadata = {"codebase_path": str(codebase_path), "file_hashes": {}}
 
         # Remove deleted files from metadata
         for deleted_file in deleted_files:
@@ -554,40 +558,28 @@ class IndexingService:
         metadata_path = self.config.INDEX_CACHE_DIR / "index_metadata.json"
 
         if not metadata_path.exists():
-            return IndexingStatus(
-                is_indexed=False,
-                total_files=0,
-                total_chunks=0,
-                index_size_mb=0.0
-            )
+            return IndexingStatus(is_indexed=False, total_files=0, total_chunks=0, index_size_mb=0.0)
 
         try:
             with open(metadata_path) as f:
                 metadata = json.load(f)
 
             # Calculate index size
-            index_size = sum(
-                f.stat().st_size
-                for f in self.config.INDEX_CACHE_DIR.iterdir()
-                if f.is_file()
-            ) / (1024 * 1024)  # Convert to MB
+            index_size = sum(f.stat().st_size for f in self.config.INDEX_CACHE_DIR.iterdir() if f.is_file()) / (
+                1024 * 1024
+            )  # Convert to MB
 
             return IndexingStatus(
                 is_indexed=True,
                 last_indexed=metadata.get("last_indexed"),
                 total_files=len(metadata.get("file_hashes", {})),
                 total_chunks=metadata.get("total_chunks", 0),
-                index_size_mb=round(index_size, 2)
+                index_size_mb=round(index_size, 2),
             )
 
         except Exception as e:
             logger.error(f"Error reading index metadata: {e}")
-            return IndexingStatus(
-                is_indexed=False,
-                total_files=0,
-                total_chunks=0,
-                index_size_mb=0.0
-            )
+            return IndexingStatus(is_indexed=False, total_files=0, total_chunks=0, index_size_mb=0.0)
 
     async def needs_reindexing(self, codebase_path: str) -> bool:
         """Check if codebase needs reindexing based on file changes."""
@@ -634,11 +626,7 @@ class IndexingService:
 
         # Get current source files
         codebase_path_obj = Path(codebase_path)
-        current_files = await self._discover_source_files(
-            codebase_path_obj,
-            None,
-            self.config.DEFAULT_EXCLUDE_PATTERNS
-        )
+        current_files = await self._discover_source_files(codebase_path_obj, None, self.config.DEFAULT_EXCLUDE_PATTERNS)
 
         if not metadata_path.exists():
             # No previous index - all files are new

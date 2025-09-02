@@ -72,15 +72,10 @@ def mock_config():
 
 
 class TestIndexingService:
-
     @pytest.mark.asyncio
     async def test_index_codebase_success(self, indexing_service, temp_codebase, mock_config):
         """Test successful codebase indexing."""
-        request = IndexingRequest(
-            codebase_path=str(temp_codebase),
-            languages=None,
-            exclude_patterns=None
-        )
+        request = IndexingRequest(codebase_path=str(temp_codebase), languages=None, exclude_patterns=None)
 
         result = await indexing_service.index_codebase(request)
 
@@ -94,11 +89,7 @@ class TestIndexingService:
     @pytest.mark.asyncio
     async def test_index_codebase_with_language_filter(self, indexing_service, temp_codebase, mock_config):
         """Test indexing with language filtering."""
-        request = IndexingRequest(
-            codebase_path=str(temp_codebase),
-            languages=["python"],
-            exclude_patterns=None
-        )
+        request = IndexingRequest(codebase_path=str(temp_codebase), languages=["python"], exclude_patterns=None)
 
         result = await indexing_service.index_codebase(request)
 
@@ -110,11 +101,7 @@ class TestIndexingService:
     @pytest.mark.asyncio
     async def test_index_codebase_invalid_path(self, indexing_service):
         """Test indexing with invalid codebase path."""
-        request = IndexingRequest(
-            codebase_path="/nonexistent/path",
-            languages=None,
-            exclude_patterns=None
-        )
+        request = IndexingRequest(codebase_path="/nonexistent/path", languages=None, exclude_patterns=None)
 
         with pytest.raises(ValueError, match="Codebase path does not exist"):
             await indexing_service.index_codebase(request)
@@ -122,11 +109,7 @@ class TestIndexingService:
     @pytest.mark.asyncio
     async def test_discover_source_files(self, indexing_service, temp_codebase, mock_config):
         """Test source file discovery."""
-        files = await indexing_service._discover_source_files(
-            temp_codebase,
-            None,
-            ["**/.git/**"]
-        )
+        files = await indexing_service._discover_source_files(temp_codebase, None, ["**/.git/**"])
 
         assert len(files) >= 2
         file_names = [f.name for f in files]
@@ -139,7 +122,7 @@ class TestIndexingService:
         files = await indexing_service._discover_source_files(
             temp_codebase,
             None,
-            ["**/*.js"]  # Exclude JavaScript files
+            ["**/*.js"],  # Exclude JavaScript files
         )
 
         file_names = [f.name for f in files]
@@ -219,7 +202,7 @@ class TestIndexingService:
                 start_line=1,
                 end_line=1,
                 language="python",
-                semantic_type="function_definition"
+                semantic_type="function_definition",
             )
         ]
 
@@ -266,7 +249,7 @@ class TestIndexingService:
                 start_line=1,
                 end_line=1,
                 language="python",
-                semantic_type="function_definition"
+                semantic_type="function_definition",
             )
         ]
         await indexing_service._store_index_metadata(temp_codebase, chunks)
@@ -295,11 +278,7 @@ class TestIndexingService:
             metadata_path.unlink()
 
         # First index
-        request = IndexingRequest(
-            codebase_path=str(temp_codebase),
-            languages=None,
-            exclude_patterns=None
-        )
+        request = IndexingRequest(codebase_path=str(temp_codebase), languages=None, exclude_patterns=None)
 
         await indexing_service.index_codebase(request)
 
@@ -321,11 +300,7 @@ class TestIndexingService:
             metadata_path.unlink()
 
         # First index
-        request = IndexingRequest(
-            codebase_path=str(temp_codebase),
-            languages=None,
-            exclude_patterns=None
-        )
+        request = IndexingRequest(codebase_path=str(temp_codebase), languages=None, exclude_patterns=None)
 
         first_result = await indexing_service.index_codebase(request)
         assert first_result.status == "success"
@@ -354,21 +329,18 @@ class ModifiedCalculator:
         from unittest.mock import AsyncMock, patch
 
         from ...models.indexing_models import IndexingRequest
+
         # Ensure clean state
         metadata_path = indexing_service.config.INDEX_CACHE_DIR / "index_metadata.json"
         if metadata_path.exists():
             metadata_path.unlink()
         # Mock SearchService embedding generation
-        with patch('src.services.search_service.SearchService') as mock_search_service_class:
+        with patch("src.services.search_service.SearchService") as mock_search_service_class:
             mock_search_service = AsyncMock()
             mock_search_service.embed_code_chunks = AsyncMock(return_value=[])
             mock_search_service.remove_file_embeddings = AsyncMock()
             mock_search_service_class.return_value = mock_search_service
-            request = IndexingRequest(
-                codebase_path=str(temp_codebase),
-                languages=None,
-                exclude_patterns=None
-            )
+            request = IndexingRequest(codebase_path=str(temp_codebase), languages=None, exclude_patterns=None)
 
             result = await indexing_service.index_codebase(request)
             # Verify embedding generation was called
@@ -384,6 +356,7 @@ class ModifiedCalculator:
         from unittest.mock import patch
 
         from ...models.indexing_models import IndexingRequest
+
         # Mock config with embeddings disabled
         mock_config.EMBEDDING_ENABLED = False
         with patch("src.services.indexing_service.get_settings") as mock_settings:
@@ -393,11 +366,7 @@ class ModifiedCalculator:
             metadata_path = service.config.INDEX_CACHE_DIR / "index_metadata.json"
             if metadata_path.exists():
                 metadata_path.unlink()
-            request = IndexingRequest(
-                codebase_path=str(temp_codebase),
-                languages=None,
-                exclude_patterns=None
-            )
+            request = IndexingRequest(codebase_path=str(temp_codebase), languages=None, exclude_patterns=None)
 
             result = await service.index_codebase(request)
             # Should still work but without embeddings

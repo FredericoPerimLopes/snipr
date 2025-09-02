@@ -8,7 +8,7 @@ class Config:
     INDEX_CACHE_DIR: Path = Path(os.getenv("INDEX_CACHE_DIR", ".index_cache"))
 
     # Embedding model configuration
-    EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
+    EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "jinaai/jina-embeddings-v2-base-code")
     _embedding_enabled_env = os.getenv("EMBEDDING_ENABLED", "true").lower()
     EMBEDDING_ENABLED: bool = _embedding_enabled_env == "true"
     EMBEDDING_BATCH_SIZE: int = int(os.getenv("EMBEDDING_BATCH_SIZE", "32"))
@@ -20,8 +20,21 @@ class Config:
 
     # Tree-sitter configuration
     SUPPORTED_LANGUAGES: ClassVar[list[str]] = [
-        "python", "javascript", "typescript", "go", "rust", "java",
-        "c", "cpp", "csharp", "php", "ruby", "html", "css", "json", "yaml"
+        "python",
+        "javascript",
+        "typescript",
+        "go",
+        "rust",
+        "java",
+        "c",
+        "cpp",
+        "csharp",
+        "php",
+        "ruby",
+        "html",
+        "css",
+        "json",
+        "yaml",
     ]
 
     # Vector database configuration
@@ -45,7 +58,7 @@ class Config:
         "**/dist/**",
         "**/*.log",
         "**/*.tmp",
-        "**/coverage/**"
+        "**/coverage/**",
     ]
 
 

@@ -26,10 +26,7 @@ from .tools.search_code import (
 )
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -39,11 +36,7 @@ app = FastMCP("Code Indexer")
 
 # Register indexing tools
 @app.tool()
-async def index_codebase_tool(
-    codebase_path: str,
-    languages: str = None,
-    exclude_patterns: str = None
-) -> str:
+async def index_codebase_tool(codebase_path: str, languages: str = None, exclude_patterns: str = None) -> str:
     """Index a codebase for semantic search."""
     return await index_codebase(codebase_path, languages, exclude_patterns)
 
@@ -63,31 +56,20 @@ async def clear_index_tool() -> str:
 # Register search tools
 @app.tool()
 async def search_code_tool(
-    query: str,
-    language: str = None,
-    max_results: int = 10,
-    similarity_threshold: float = 0.7
+    query: str, language: str = None, max_results: int = 10, similarity_threshold: float = 0.7
 ) -> str:
     """Search for semantically similar code chunks."""
     return await search_code(query, language, max_results, similarity_threshold)
 
 
 @app.tool()
-async def search_by_type_tool(
-    semantic_type: str,
-    language: str = None,
-    max_results: int = 20
-) -> str:
+async def search_by_type_tool(semantic_type: str, language: str = None, max_results: int = 20) -> str:
     """Search for code chunks by semantic type."""
     return await search_by_type(semantic_type, language, max_results)
 
 
 @app.tool()
-async def search_in_file_tool(
-    file_path: str,
-    query: str,
-    max_results: int = 5
-) -> str:
+async def search_in_file_tool(file_path: str, query: str, max_results: int = 5) -> str:
     """Search for code patterns within a specific file."""
     return await search_in_file(file_path, query, max_results)
 
@@ -115,24 +97,16 @@ async def health_check() -> str:
                 "tree_sitter_parsers": len(indexing_service.parsers),
                 "supported_languages": len(indexing_service.config.SUPPORTED_LANGUAGES),
                 "embedding_model_loaded": search_service.model is not None,
-                "vector_db_available": search_service.db_path.exists()
+                "vector_db_available": search_service.db_path.exists(),
             },
-            "server_info": {
-                "name": "Code Indexer MCP Server",
-                "version": "0.1.0",
-                "tools_available": 7
-            }
+            "server_info": {"name": "Code Indexer MCP Server", "version": "0.1.0", "tools_available": 7},
         }
 
         return json.dumps(health_status)
 
     except Exception as e:
         logger.error(f"Health check failed: {e}")
-        return json.dumps({
-            "status": "unhealthy",
-            "error": str(e),
-            "error_type": type(e).__name__
-        })
+        return json.dumps({"status": "unhealthy", "error": str(e), "error_type": type(e).__name__})
 
 
 def main():

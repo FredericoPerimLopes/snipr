@@ -12,10 +12,7 @@ search_service = SearchService()
 
 
 async def search_code(
-    query: str,
-    language: str | None = None,
-    max_results: int = 10,
-    similarity_threshold: float = 0.7
+    query: str, language: str | None = None, max_results: int = 10, similarity_threshold: float = 0.7
 ) -> str:
     """Search for semantically similar code chunks.
 
@@ -34,7 +31,7 @@ async def search_code(
             query=query,
             language=language,
             max_results=max(1, min(100, max_results)),  # Clamp to valid range
-            similarity_threshold=max(0.0, min(1.0, similarity_threshold))  # Clamp to valid range
+            similarity_threshold=max(0.0, min(1.0, similarity_threshold)),  # Clamp to valid range
         )
 
         # Perform semantic search
@@ -49,9 +46,9 @@ async def search_code(
             "filters": {
                 "language": language,
                 "max_results": request.max_results,
-                "similarity_threshold": request.similarity_threshold
+                "similarity_threshold": request.similarity_threshold,
             },
-            "message": f"Found {search_result.total_matches} results in {search_result.query_time_ms:.1f}ms"
+            "message": f"Found {search_result.total_matches} results in {search_result.query_time_ms:.1f}ms",
         }
 
         logger.info(f"Search completed: {search_result.total_matches} results in {search_result.query_time_ms:.1f}ms")
@@ -60,19 +57,17 @@ async def search_code(
 
     except Exception as e:
         logger.error(f"Error during code search: {e}")
-        return json.dumps({
-            "status": "error",
-            "message": f"Failed to search code: {e!s}",
-            "error_type": type(e).__name__,
-            "query": query
-        })
+        return json.dumps(
+            {
+                "status": "error",
+                "message": f"Failed to search code: {e!s}",
+                "error_type": type(e).__name__,
+                "query": query,
+            }
+        )
 
 
-async def search_by_type(
-    semantic_type: str,
-    language: str | None = None,
-    max_results: int = 20
-) -> str:
+async def search_by_type(semantic_type: str, language: str | None = None, max_results: int = 20) -> str:
     """Search for code chunks by semantic type (function, class, etc.).
 
     Args:
@@ -86,16 +81,10 @@ async def search_by_type(
     try:
         # Use keyword search for semantic type filtering
         # This is a simpler approach than embedding-based search for type filtering
-        results = await search_service.search_by_keywords(
-            query=semantic_type,
-            language_filter=language
-        )
+        results = await search_service.search_by_keywords(query=semantic_type, language_filter=language)
 
         # Filter by exact semantic type match
-        filtered_results = [
-            result for result in results
-            if result.semantic_type == semantic_type
-        ][:max_results]
+        filtered_results = [result for result in results if result.semantic_type == semantic_type][:max_results]
 
         response = {
             "status": "success",
@@ -103,7 +92,7 @@ async def search_by_type(
             "total_matches": len(filtered_results),
             "semantic_type": semantic_type,
             "language_filter": language,
-            "message": f"Found {len(filtered_results)} {semantic_type} examples"
+            "message": f"Found {len(filtered_results)} {semantic_type} examples",
         }
 
         logger.info(f"Type search completed: {len(filtered_results)} {semantic_type} results")
@@ -112,19 +101,17 @@ async def search_by_type(
 
     except Exception as e:
         logger.error(f"Error searching by type: {e}")
-        return json.dumps({
-            "status": "error",
-            "message": f"Failed to search by type: {e!s}",
-            "error_type": type(e).__name__,
-            "semantic_type": semantic_type
-        })
+        return json.dumps(
+            {
+                "status": "error",
+                "message": f"Failed to search by type: {e!s}",
+                "error_type": type(e).__name__,
+                "semantic_type": semantic_type,
+            }
+        )
 
 
-async def search_in_file(
-    file_path: str,
-    query: str,
-    max_results: int = 5
-) -> str:
+async def search_in_file(file_path: str, query: str, max_results: int = 5) -> str:
     """Search for code patterns within a specific file.
 
     Args:
@@ -139,16 +126,13 @@ async def search_in_file(
         # Perform general search
         search_request = SearchRequest(
             query=query,
-            max_results=max_results * 3  # Get more results to filter
+            max_results=max_results * 3,  # Get more results to filter
         )
 
         search_result = await search_service.search_code(search_request)
 
         # Filter results to specific file
-        file_results = [
-            chunk for chunk in search_result.results
-            if chunk.file_path == file_path
-        ][:max_results]
+        file_results = [chunk for chunk in search_result.results if chunk.file_path == file_path][:max_results]
 
         response = {
             "status": "success",
@@ -156,7 +140,7 @@ async def search_in_file(
             "total_matches": len(file_results),
             "file_path": file_path,
             "query": query,
-            "message": f"Found {len(file_results)} matches in {file_path}"
+            "message": f"Found {len(file_results)} matches in {file_path}",
         }
 
         logger.info(f"File search completed: {len(file_results)} results in {file_path}")
@@ -165,12 +149,14 @@ async def search_in_file(
 
     except Exception as e:
         logger.error(f"Error searching in file: {e}")
-        return json.dumps({
-            "status": "error",
-            "message": f"Failed to search in file: {e!s}",
-            "error_type": type(e).__name__,
-            "file_path": file_path
-        })
+        return json.dumps(
+            {
+                "status": "error",
+                "message": f"Failed to search in file: {e!s}",
+                "error_type": type(e).__name__,
+                "file_path": file_path,
+            }
+        )
 
 
 async def get_search_stats() -> str:
@@ -189,17 +175,15 @@ async def get_search_stats() -> str:
                 "semantic_search": search_service.model is not None,
                 "supported_languages": list(search_service.config.SUPPORTED_LANGUAGES),
                 "quantization_enabled": search_service.config.ENABLE_QUANTIZATION,
-                "max_file_size_mb": search_service.config.MAX_FILE_SIZE_MB
+                "max_file_size_mb": search_service.config.MAX_FILE_SIZE_MB,
             },
-            "message": "Successfully retrieved search statistics"
+            "message": "Successfully retrieved search statistics",
         }
 
         return json.dumps(response)
 
     except Exception as e:
         logger.error(f"Error getting search stats: {e}")
-        return json.dumps({
-            "status": "error",
-            "message": f"Failed to get search stats: {e!s}",
-            "error_type": type(e).__name__
-        })
+        return json.dumps(
+            {"status": "error", "message": f"Failed to get search stats: {e!s}", "error_type": type(e).__name__}
+        )

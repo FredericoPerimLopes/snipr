@@ -32,9 +32,7 @@ class SearchService:
             logger.info("Embedding generation disabled by configuration")
             return
         if SentenceTransformer is None:
-            logger.warning(
-                "sentence-transformers not available, semantic search disabled"
-            )
+            logger.warning("sentence-transformers not available, semantic search disabled")
             return
 
         try:
@@ -71,20 +69,10 @@ class SearchService:
             """)
 
             # Create indexes for performance
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_language ON embeddings(language)"
-            )
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_semantic_type "
-                "ON embeddings(semantic_type)"
-            )
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_file_path ON embeddings(file_path)"
-            )
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_content_hash "
-                "ON embeddings(content_hash)"
-            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_language ON embeddings(language)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_semantic_type ON embeddings(semantic_type)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_file_path ON embeddings(file_path)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_content_hash ON embeddings(content_hash)")
 
             conn.commit()
             conn.close()
@@ -110,15 +98,11 @@ class SearchService:
             # Generate embeddings in batches
             batch_size = self.config.EMBEDDING_BATCH_SIZE
             for i in range(0, len(texts), batch_size):
-                batch_texts = texts[i:i + batch_size]
-                batch_chunks = chunks[i:i + batch_size]
+                batch_texts = texts[i : i + batch_size]
+                batch_chunks = chunks[i : i + batch_size]
 
                 # Generate embeddings
-                embeddings = self.model.encode(
-                    batch_texts,
-                    normalize_embeddings=True,
-                    show_progress_bar=False
-                )
+                embeddings = self.model.encode(batch_texts, normalize_embeddings=True, show_progress_bar=False)
 
                 # Quantize embeddings if enabled
                 if self.config.ENABLE_QUANTIZATION:
@@ -133,9 +117,7 @@ class SearchService:
                 await self._store_embeddings_batch(batch_chunks)
 
             processing_time = (time.time() - start_time) * 1000
-            logger.info(
-                f"Generated embeddings for {len(chunks)} chunks in {processing_time:.1f}ms"
-            )
+            logger.info(f"Generated embeddings for {len(chunks)} chunks in {processing_time:.1f}ms")
 
             return embedded_chunks
 
@@ -167,21 +149,24 @@ class SearchService:
                 content_hash = hash(chunk.content)
 
                 # Insert or replace embedding
-                conn.execute("""
+                conn.execute(
+                    """
                     INSERT OR REPLACE INTO embeddings
                     (file_path, content, start_line, end_line, language,
                      semantic_type, embedding, content_hash)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    chunk.file_path,
-                    chunk.content,
-                    chunk.start_line,
-                    chunk.end_line,
-                    chunk.language,
-                    chunk.semantic_type,
-                    embedding_blob,
-                    str(content_hash)
-                ))
+                """,
+                    (
+                        chunk.file_path,
+                        chunk.content,
+                        chunk.start_line,
+                        chunk.end_line,
+                        chunk.language,
+                        chunk.semantic_type,
+                        embedding_blob,
+                        str(content_hash),
+                    ),
+                )
 
             conn.commit()
             conn.close()
@@ -199,10 +184,7 @@ class SearchService:
 
         try:
             # Generate query embedding
-            query_embedding = self.model.encode(
-                [request.query],
-                normalize_embeddings=True
-            )[0]
+            query_embedding = self.model.encode([request.query], normalize_embeddings=True)[0]
 
             # Quantize query embedding if enabled
             if self.config.ENABLE_QUANTIZATION:
@@ -210,30 +192,19 @@ class SearchService:
 
             # Search database for similar embeddings
             results = await self._search_similar_embeddings(
-                query_embedding,
-                request.language,
-                request.max_results,
-                request.similarity_threshold
+                query_embedding, request.language, request.max_results, request.similarity_threshold
             )
 
             query_time = (time.time() - start_time) * 1000
 
-            return SearchResponse(
-                results=results,
-                total_matches=len(results),
-                query_time_ms=round(query_time, 2)
-            )
+            return SearchResponse(results=results, total_matches=len(results), query_time_ms=round(query_time, 2))
 
         except Exception as e:
             logger.error(f"Error during semantic search: {e}")
             return SearchResponse(results=[], total_matches=0, query_time_ms=0.0)
 
     async def _search_similar_embeddings(
-        self,
-        query_embedding: np.ndarray,
-        language_filter: str | None,
-        max_results: int,
-        threshold: float
+        self, query_embedding: np.ndarray, language_filter: str | None, max_results: int, threshold: float
     ) -> list[CodeChunk]:
         """Search for similar embeddings in vector database."""
         try:
@@ -273,7 +244,7 @@ class SearchService:
                             end_line=row[3],
                             language=row[4],
                             semantic_type=row[5],
-                            embedding=stored_embedding.tolist()
+                            embedding=stored_embedding.tolist(),
                         )
                         similarities.append((similarity, chunk))
 
@@ -338,7 +309,7 @@ class SearchService:
                     end_line=row[3],
                     language=row[4],
                     semantic_type=row[5],
-                    embedding=None
+                    embedding=None,
                 )
                 results.append(chunk)
 
@@ -380,9 +351,8 @@ class SearchService:
                 "languages": dict(lang_stats),
                 "semantic_types": dict(type_stats),
                 "database_size_mb": (
-                    round(self.db_path.stat().st_size / (1024 * 1024), 2)
-                    if self.db_path.exists() else 0
-                )
+                    round(self.db_path.stat().st_size / (1024 * 1024), 2) if self.db_path.exists() else 0
+                ),
             }
 
         except Exception as e:

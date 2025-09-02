@@ -1,22 +1,15 @@
-
 from pydantic import BaseModel, Field
 
 
 class IndexingRequest(BaseModel):
     codebase_path: str = Field(..., description="Absolute path to codebase root")
-    languages: list[str] | None = Field(
-        default=None, description="Languages to index (auto-detect if None)"
-    )
-    exclude_patterns: list[str] | None = Field(
-        default=None, description="Glob patterns to exclude"
-    )
+    languages: list[str] | None = Field(default=None, description="Languages to index (auto-detect if None)")
+    exclude_patterns: list[str] | None = Field(default=None, description="Glob patterns to exclude")
 
 
 class SearchRequest(BaseModel):
     query: str = Field(..., description="Semantic search query")
-    language: str | None = Field(
-        default=None, description="Filter by programming language"
-    )
+    language: str | None = Field(default=None, description="Filter by programming language")
     max_results: int = Field(default=10, ge=1, le=100)
     similarity_threshold: float = Field(default=0.7, ge=0.0, le=1.0)
 

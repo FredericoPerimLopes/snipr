@@ -13,11 +13,7 @@ indexing_service = IndexingService()
 search_service = SearchService()
 
 
-async def index_codebase(
-    codebase_path: str,
-    languages: str | None = None,
-    exclude_patterns: str | None = None
-) -> str:
+async def index_codebase(codebase_path: str, languages: str | None = None, exclude_patterns: str | None = None) -> str:
     """Index a codebase for semantic search.
 
     Args:
@@ -39,11 +35,7 @@ async def index_codebase(
             exclude_list = [pattern.strip() for pattern in exclude_patterns.split(",")]
 
         # Create indexing request
-        request = IndexingRequest(
-            codebase_path=codebase_path,
-            languages=languages_list,
-            exclude_patterns=exclude_list
-        )
+        request = IndexingRequest(codebase_path=codebase_path, languages=languages_list, exclude_patterns=exclude_list)
 
         # Check if reindexing is needed
         needs_reindex = await indexing_service.needs_reindexing(codebase_path)
@@ -51,11 +43,13 @@ async def index_codebase(
         if not needs_reindex:
             # Return current status if no reindexing needed
             status = await indexing_service.get_indexing_status(codebase_path)
-            return json.dumps({
-                "status": "already_indexed",
-                "message": "Codebase is already up to date",
-                "indexing_status": status.model_dump()
-            })
+            return json.dumps(
+                {
+                    "status": "already_indexed",
+                    "message": "Codebase is already up to date",
+                    "indexing_status": status.model_dump(),
+                }
+            )
 
         # Perform indexing
         logger.info(f"Starting indexing for {codebase_path}")
@@ -77,23 +71,20 @@ async def index_codebase(
             "message": (
                 f"Successfully indexed {indexing_result.indexed_files} files "
                 f"with {indexing_result.total_chunks} code chunks"
-            )
+            ),
         }
 
         logger.info(
-            f"Indexing completed: {indexing_result.total_chunks} chunks "
-            f"in {indexing_result.processing_time_ms:.1f}ms"
+            f"Indexing completed: {indexing_result.total_chunks} chunks in {indexing_result.processing_time_ms:.1f}ms"
         )
 
         return json.dumps(response)
 
     except Exception as e:
         logger.error(f"Error indexing codebase: {e}")
-        return json.dumps({
-            "status": "error",
-            "message": f"Failed to index codebase: {e!s}",
-            "error_type": type(e).__name__
-        })
+        return json.dumps(
+            {"status": "error", "message": f"Failed to index codebase: {e!s}", "error_type": type(e).__name__}
+        )
 
 
 async def get_indexing_status(codebase_path: str) -> str:
@@ -113,18 +104,16 @@ async def get_indexing_status(codebase_path: str) -> str:
             "status": "success",
             "indexing_status": status.model_dump(),
             "embeddings_stats": embeddings_stats,
-            "message": "Successfully retrieved indexing status"
+            "message": "Successfully retrieved indexing status",
         }
 
         return json.dumps(response)
 
     except Exception as e:
         logger.error(f"Error getting indexing status: {e}")
-        return json.dumps({
-            "status": "error",
-            "message": f"Failed to get indexing status: {e!s}",
-            "error_type": type(e).__name__
-        })
+        return json.dumps(
+            {"status": "error", "message": f"Failed to get indexing status: {e!s}", "error_type": type(e).__name__}
+        )
 
 
 async def clear_index() -> str:
@@ -148,18 +137,13 @@ async def clear_index() -> str:
         # Reinitialize vector database
         search_service._init_vector_db()
 
-        response = {
-            "status": "success",
-            "message": "Successfully cleared all indexing data"
-        }
+        response = {"status": "success", "message": "Successfully cleared all indexing data"}
 
         logger.info("Index cache cleared successfully")
         return json.dumps(response)
 
     except Exception as e:
         logger.error(f"Error clearing index: {e}")
-        return json.dumps({
-            "status": "error",
-            "message": f"Failed to clear index: {e!s}",
-            "error_type": type(e).__name__
-        })
+        return json.dumps(
+            {"status": "error", "message": f"Failed to clear index: {e!s}", "error_type": type(e).__name__}
+        )

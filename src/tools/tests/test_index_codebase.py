@@ -44,7 +44,6 @@ def mock_search_service():
 
 
 class TestIndexCodebaseTool:
-
     @pytest.mark.asyncio
     async def test_index_codebase_success(self, temp_codebase, mock_indexing_service, mock_search_service):
         """Test successful codebase indexing."""
@@ -55,18 +54,14 @@ class TestIndexCodebaseTool:
             total_chunks=4,
             processing_time_ms=150.5,
             languages_detected=["python", "javascript"],
-            status="success"
+            status="success",
         )
         mock_indexing_service.get_indexing_status.return_value = IndexingStatus(
-            is_indexed=True,
-            last_indexed="2025-01-01T00:00:00",
-            total_files=2,
-            total_chunks=4,
-            index_size_mb=1.2
+            is_indexed=True, last_indexed="2025-01-01T00:00:00", total_files=2, total_chunks=4, index_size_mb=1.2
         )
         mock_search_service.get_embeddings_stats.return_value = {
             "total_embeddings": 4,
-            "languages": {"python": 2, "javascript": 2}
+            "languages": {"python": 2, "javascript": 2},
         }
 
         # Execute tool
@@ -87,11 +82,7 @@ class TestIndexCodebaseTool:
         # Setup mocks
         mock_indexing_service.needs_reindexing.return_value = False
         mock_indexing_service.get_indexing_status.return_value = IndexingStatus(
-            is_indexed=True,
-            last_indexed="2025-01-01T00:00:00",
-            total_files=2,
-            total_chunks=4,
-            index_size_mb=1.2
+            is_indexed=True, last_indexed="2025-01-01T00:00:00", total_files=2, total_chunks=4, index_size_mb=1.2
         )
 
         # Execute tool
@@ -109,26 +100,15 @@ class TestIndexCodebaseTool:
         # Setup mocks
         mock_indexing_service.needs_reindexing.return_value = True
         mock_indexing_service.index_codebase.return_value = IndexingResponse(
-            indexed_files=1,
-            total_chunks=2,
-            processing_time_ms=100.0,
-            languages_detected=["python"],
-            status="success"
+            indexed_files=1, total_chunks=2, processing_time_ms=100.0, languages_detected=["python"], status="success"
         )
         mock_indexing_service.get_indexing_status.return_value = IndexingStatus(
-            is_indexed=True,
-            total_files=1,
-            total_chunks=2,
-            index_size_mb=0.5
+            is_indexed=True, total_files=1, total_chunks=2, index_size_mb=0.5
         )
         mock_search_service.get_embeddings_stats.return_value = {"total_embeddings": 2}
 
         # Execute tool with language filter
-        result_json = await index_codebase(
-            str(temp_codebase),
-            languages="python",
-            exclude_patterns="**/*.js"
-        )
+        result_json = await index_codebase(str(temp_codebase), languages="python", exclude_patterns="**/*.js")
         result = json.loads(result_json)
 
         # Verify response
@@ -139,9 +119,7 @@ class TestIndexCodebaseTool:
     async def test_index_codebase_invalid_path(self, mock_indexing_service, mock_search_service):
         """Test indexing with invalid path."""
         # Setup mock to raise exception
-        mock_indexing_service.needs_reindexing.side_effect = ValueError(
-            "Codebase path does not exist"
-        )
+        mock_indexing_service.needs_reindexing.side_effect = ValueError("Codebase path does not exist")
 
         # Execute tool
         result_json = await index_codebase("/nonexistent/path")
@@ -153,21 +131,15 @@ class TestIndexCodebaseTool:
         assert result["error_type"] == "ValueError"
 
     @pytest.mark.asyncio
-    async def test_get_indexing_status_success(
-        self, temp_codebase, mock_indexing_service, mock_search_service
-    ):
+    async def test_get_indexing_status_success(self, temp_codebase, mock_indexing_service, mock_search_service):
         """Test getting indexing status."""
         # Setup mocks
         mock_indexing_service.get_indexing_status.return_value = IndexingStatus(
-            is_indexed=True,
-            last_indexed="2025-01-01T00:00:00",
-            total_files=5,
-            total_chunks=20,
-            index_size_mb=2.5
+            is_indexed=True, last_indexed="2025-01-01T00:00:00", total_files=5, total_chunks=20, index_size_mb=2.5
         )
         mock_search_service.get_embeddings_stats.return_value = {
             "total_embeddings": 20,
-            "languages": {"python": 15, "javascript": 5}
+            "languages": {"python": 15, "javascript": 5},
         }
 
         # Execute tool
@@ -205,24 +177,15 @@ class TestIndexCodebaseTool:
         assert not test_file.exists()
 
     @pytest.mark.asyncio
-    async def test_index_codebase_json_response_format(
-        self, temp_codebase, mock_indexing_service, mock_search_service
-    ):
+    async def test_index_codebase_json_response_format(self, temp_codebase, mock_indexing_service, mock_search_service):
         """Test that tool returns valid JSON string."""
         # Setup mocks
         mock_indexing_service.needs_reindexing.return_value = True
         mock_indexing_service.index_codebase.return_value = IndexingResponse(
-            indexed_files=1,
-            total_chunks=1,
-            processing_time_ms=50.0,
-            languages_detected=["python"],
-            status="success"
+            indexed_files=1, total_chunks=1, processing_time_ms=50.0, languages_detected=["python"], status="success"
         )
         mock_indexing_service.get_indexing_status.return_value = IndexingStatus(
-            is_indexed=True,
-            total_files=1,
-            total_chunks=1,
-            index_size_mb=0.1
+            is_indexed=True, total_files=1, total_chunks=1, index_size_mb=0.1
         )
         mock_search_service.get_embeddings_stats.return_value = {"total_embeddings": 1}
 

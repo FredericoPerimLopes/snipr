@@ -34,31 +34,26 @@ def sample_search_response():
                 end_line=2,
                 language="python",
                 semantic_type="function_definition",
-                embedding=[0.1, 0.2, 0.3]
+                embedding=[0.1, 0.2, 0.3],
             ),
             CodeChunk(
                 file_path="/test/utils.py",
-                content=(
-                    "class Logger:\n    def log(self, message):\n        print(message)"
-                ),
+                content=("class Logger:\n    def log(self, message):\n        print(message)"),
                 start_line=5,
                 end_line=7,
                 language="python",
                 semantic_type="class_definition",
-                embedding=[0.4, 0.5, 0.6]
-            )
+                embedding=[0.4, 0.5, 0.6],
+            ),
         ],
         total_matches=2,
-        query_time_ms=125.5
+        query_time_ms=125.5,
     )
 
 
 class TestSearchCodeTool:
-
     @pytest.mark.asyncio
-    async def test_search_code_success(
-        self, mock_search_service, sample_search_response
-    ):
+    async def test_search_code_success(self, mock_search_service, sample_search_response):
         """Test successful code search."""
         # Setup mock
         mock_search_service.search_code.return_value = sample_search_response
@@ -82,9 +77,7 @@ class TestSearchCodeTool:
         assert len(search_result["results"]) == 2
 
     @pytest.mark.asyncio
-    async def test_search_code_parameter_validation(
-        self, mock_search_service, sample_search_response
-    ):
+    async def test_search_code_parameter_validation(self, mock_search_service, sample_search_response):
         """Test parameter validation and clamping."""
         mock_search_service.search_code.return_value = sample_search_response
 
@@ -133,7 +126,7 @@ class TestSearchCodeTool:
                 end_line=1,
                 language="python",
                 semantic_type="function_definition",
-                embedding=None
+                embedding=None,
             ),
             CodeChunk(
                 file_path="/test/file2.py",
@@ -142,8 +135,8 @@ class TestSearchCodeTool:
                 end_line=1,
                 language="python",
                 semantic_type="function_definition",
-                embedding=None
-            )
+                embedding=None,
+            ),
         ]
 
         # Execute tool
@@ -158,9 +151,7 @@ class TestSearchCodeTool:
         assert len(result["results"]) == 2
 
     @pytest.mark.asyncio
-    async def test_search_in_file_success(
-        self, mock_search_service, sample_search_response
-    ):
+    async def test_search_in_file_success(self, mock_search_service, sample_search_response):
         """Test searching within specific file."""
         # Setup mock
         mock_search_service.search_code.return_value = sample_search_response
@@ -183,7 +174,7 @@ class TestSearchCodeTool:
             "total_embeddings": 100,
             "languages": {"python": 60, "javascript": 40},
             "semantic_types": {"function_definition": 50, "class_definition": 30},
-            "database_size_mb": 5.2
+            "database_size_mb": 5.2,
         }
 
         # Mock config access
@@ -204,9 +195,7 @@ class TestSearchCodeTool:
         assert result["capabilities"]["quantization_enabled"] is True
 
     @pytest.mark.asyncio
-    async def test_json_response_format(
-        self, mock_search_service, sample_search_response
-    ):
+    async def test_json_response_format(self, mock_search_service, sample_search_response):
         """Test that all tools return valid JSON strings."""
         # Setup mock
         mock_search_service.search_code.return_value = sample_search_response
@@ -217,7 +206,7 @@ class TestSearchCodeTool:
             (search_code, ("test query",)),
             (search_by_type, ("function_definition",)),
             (search_in_file, ("/test/file.py", "test")),
-            (get_search_stats, ())
+            (get_search_stats, ()),
         ]
 
         for tool_func, args in tools_to_test:
@@ -236,9 +225,7 @@ class TestSearchCodeTool:
         """Test error handling across all search tools."""
         # Setup mocks to raise exceptions
         mock_search_service.search_code.side_effect = Exception("Search service error")
-        mock_search_service.search_by_keywords.side_effect = Exception(
-            "Keyword search error"
-        )
+        mock_search_service.search_by_keywords.side_effect = Exception("Keyword search error")
         mock_search_service.get_embeddings_stats.side_effect = Exception("Stats error")
 
         # Test each tool handles errors gracefully
@@ -246,7 +233,7 @@ class TestSearchCodeTool:
             (search_code, ("test",), "Search service error"),
             (search_by_type, ("function",), "Keyword search error"),
             (search_in_file, ("/test/file.py", "test"), "Search service error"),
-            (get_search_stats, (), "Stats error")
+            (get_search_stats, (), "Stats error"),
         ]
 
         for tool_func, args, expected_error in tools_to_test:
