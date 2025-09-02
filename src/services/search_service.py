@@ -50,7 +50,7 @@ class SearchService:
         try:
             # Create cache directory if it doesn't exist
             self.config.INDEX_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-            
+
             # Run database migration first
             migration = DatabaseMigration()
             import asyncio
@@ -93,7 +93,7 @@ class SearchService:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_semantic_type ON embeddings(semantic_type)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_file_path ON embeddings(file_path)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_content_hash ON embeddings(content_hash)")
-            
+
             # Create metadata indexes
             conn.execute("CREATE INDEX IF NOT EXISTS idx_function_name ON embeddings(function_name)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_class_name ON embeddings(class_name)")
@@ -358,19 +358,19 @@ class SearchService:
         try:
             # Get BM25 results (document IDs with scores)
             bm25_results = await self.bm25_engine.search(query, language_filter, max_results)
-            
+
             if not bm25_results:
                 return []
 
             # Convert document IDs back to CodeChunks
             chunks = []
             conn = sqlite3.connect(str(self.db_path))
-            
+
             for doc_id, score in bm25_results:
                 # Parse document ID to get file_path and start_line
                 file_path, start_line_str = doc_id.rsplit(':', 1)
                 start_line = int(start_line_str)
-                
+
                 # Query database for full chunk data
                 cursor = conn.execute(
                     """
@@ -378,12 +378,12 @@ class SearchService:
                            function_signature, class_name, function_name, parameter_types, return_type,
                            inheritance_chain, import_statements, docstring, complexity_score,
                            dependencies, interfaces, decorators
-                    FROM embeddings 
+                    FROM embeddings
                     WHERE file_path = ? AND start_line = ?
                     """,
                     (file_path, start_line)
                 )
-                
+
                 row = cursor.fetchone()
                 if row:
                     # Deserialize metadata fields
@@ -415,7 +415,7 @@ class SearchService:
                         decorators=decorators,
                     )
                     chunks.append(chunk)
-            
+
             conn.close()
             return chunks
 
