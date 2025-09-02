@@ -489,8 +489,8 @@ class CodeTokenizer:
         # Remove comments and strings to focus on code structure
         cleaned_content = self._remove_comments_and_strings(content, language)
 
-        # Split on various delimiters
-        tokens = re.split(r"[\s\(\)\[\]\{\},;\.:\+\-\*\/\=\<\>\!\&\|\^\%\#\@\$\~\?]+", cleaned_content.lower())
+        # Split on various delimiters (preserve case for compound identifier splitting)
+        tokens = re.split(r"[\s\(\)\[\]\{\},;\.:\+\-\*\/\=\<\>\!\&\|\^\%\#\@\$\~\?]+", cleaned_content)
 
         # Remove empty tokens
         tokens = [t for t in tokens if t and len(t) > 1]
@@ -498,9 +498,10 @@ class CodeTokenizer:
         # Advanced token processing
         processed_tokens = []
         for token in tokens:
-            # Split compound identifiers
+            # Split compound identifiers (preserving original case)
             subtokens = self._split_compound_identifier(token)
-            processed_tokens.extend(subtokens)
+            # Convert to lowercase after compound splitting
+            processed_tokens.extend([t.lower() for t in subtokens])
 
         # Filter tokens
         language_stops = self.language_keywords.get(language, set())
@@ -521,6 +522,9 @@ class CodeTokenizer:
     def _split_compound_identifier(self, identifier: str) -> list[str]:
         """Split camelCase, snake_case, and kebab-case identifiers."""
         tokens = []
+        
+        # Always include the original identifier
+        tokens.append(identifier)
 
         # Split snake_case and kebab-case
         if "_" in identifier or "-" in identifier:
@@ -531,8 +535,6 @@ class CodeTokenizer:
         camel_parts = re.findall(r"[a-z]+|[A-Z][a-z]*|[A-Z]+(?=[A-Z][a-z]|\b)", identifier)
         if len(camel_parts) > 1:
             tokens.extend([part.lower() for part in camel_parts])
-        elif not tokens:  # Only add original if no other splits found
-            tokens.append(identifier)
 
         return tokens
 
