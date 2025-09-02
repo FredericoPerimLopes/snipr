@@ -25,12 +25,12 @@ class TestMetadataExtractor:
         identifier_child = Mock(spec=Node)
         identifier_child.type = "identifier"
         identifier_child.start_byte = 4
-        identifier_child.end_byte = 12
+        identifier_child.end_byte = 13  # Fixed: should include the full "test_func"
 
         parameters_child = Mock(spec=Node)
         parameters_child.type = "parameters"
-        parameters_child.start_byte = 12
-        parameters_child.end_byte = 20
+        parameters_child.start_byte = 13
+        parameters_child.end_byte = 26
         parameters_child.children = []
 
         node.children = [identifier_child, parameters_child]
@@ -50,10 +50,10 @@ class TestMetadataExtractor:
     async def test_extract_function_signature(self, extractor):
         """Test function signature extraction."""
         # Create a more realistic mock
-        with patch.object(extractor, '_get_node_text') as mock_get_text:
+        with patch.object(extractor, "_get_node_text") as mock_get_text:
             mock_get_text.side_effect = lambda node, child_type, content: {
                 "identifier": "calculate_sum",
-                "parameters": "(a: int, b: int)"
+                "parameters": "(a: int, b: int)",
             }.get(child_type)
 
             node = Mock(spec=Node)
@@ -149,7 +149,7 @@ def function2():
     pass
 """
 
-        with patch.object(extractor, 'parsers') as mock_parsers:
+        with patch.object(extractor, "parsers") as mock_parsers:
             mock_parser = Mock()
             mock_tree = Mock()
             mock_root = Mock()
