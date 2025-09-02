@@ -298,12 +298,17 @@ class SyntacticChunker:
 
         # Don't merge distinct semantic constructs (function with class, etc.)
         distinct_types = {
-            "function_definition", "class_definition", "interface_declaration", 
-            "method_definition", "constructor_definition"
+            "function_definition",
+            "class_definition",
+            "interface_declaration",
+            "method_definition",
+            "constructor_definition",
         }
-        if (chunk1.semantic_type in distinct_types and 
-            chunk2.semantic_type in distinct_types and 
-            chunk1.semantic_type != chunk2.semantic_type):
+        if (
+            chunk1.semantic_type in distinct_types
+            and chunk2.semantic_type in distinct_types
+            and chunk1.semantic_type != chunk2.semantic_type
+        ):
             return None
 
         # Check if chunks are adjacent or nearly adjacent

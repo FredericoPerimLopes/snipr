@@ -522,7 +522,7 @@ class CodeTokenizer:
     def _split_compound_identifier(self, identifier: str) -> list[str]:
         """Split camelCase, snake_case, and kebab-case identifiers."""
         tokens = []
-        
+
         # Always include the original identifier
         tokens.append(identifier)
 
