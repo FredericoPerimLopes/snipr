@@ -61,9 +61,9 @@ class HybridSearchService:
             query_time = (asyncio.get_event_loop().time() - start_time) * 1000
 
             return SearchResponse(
-                results=final_results[:request.max_results],
+                results=final_results[: request.max_results],
                 total_matches=len(combined_results),
-                query_time_ms=round(query_time, 2)
+                query_time_ms=round(query_time, 2),
             )
 
         except Exception as e:
@@ -91,11 +91,7 @@ class HybridSearchService:
     async def _run_bm25_search(self, request: SearchRequest) -> list[CodeChunk]:
         """Run BM25 lexical search."""
         try:
-            results = await self.search_service.search_by_bm25(
-                request.query,
-                request.language,
-                max_results=50
-            )
+            results = await self.search_service.search_by_bm25(request.query, request.language, max_results=50)
             logger.debug(f"BM25 search returned {len(results)} results")
             return results
         except Exception as e:
@@ -129,14 +125,16 @@ class HybridSearchService:
         """Detect the type of query for intelligent routing."""
         query_lower = query.lower()
 
-        # Code-specific patterns
-        if any(pattern in query_lower for pattern in ['function', 'method', 'def ', 'async def']):
-            return "function_search"
-        elif any(pattern in query_lower for pattern in ['class', 'interface', 'struct']):
-            return "class_search"
-        elif any(pattern in query_lower for pattern in ['import', 'require', 'include']):
+        # Code-specific patterns - check more specific patterns first
+        if any(pattern in query_lower for pattern in ["return type", "parameter type", "function type"]):
+            return "type_search"
+        elif any(pattern in query_lower for pattern in ["import", "require", "include"]):
             return "import_search"
-        elif any(pattern in query_lower for pattern in ['type', 'return', 'parameter']):
+        elif any(pattern in query_lower for pattern in ["class", "interface", "struct"]):
+            return "class_search"
+        elif any(pattern in query_lower for pattern in ["function", "method", "def ", "async def"]):
+            return "function_search"
+        elif any(pattern in query_lower for pattern in ["type", "parameter"]):
             return "type_search"
         else:
             return "general_search"
@@ -147,9 +145,19 @@ class HybridSearchService:
 
         # Use metadata search for specific query types
         metadata_indicators = [
-            'function', 'method', 'class', 'interface', 'type', 'return',
-            'parameter', 'inherit', 'extend', 'implement', 'decorator',
-            'complexity', 'signature'
+            "function",
+            "method",
+            "class",
+            "interface",
+            "type",
+            "return",
+            "parameter",
+            "inherit",
+            "extend",
+            "implement",
+            "decorator",
+            "complexity",
+            "signature",
         ]
 
         return any(indicator in query_lower for indicator in metadata_indicators)
