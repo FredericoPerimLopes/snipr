@@ -22,7 +22,7 @@ class CodeChunk(BaseModel):
     language: str
     semantic_type: str  # function, class, variable, etc.
     embedding: list[float] | None = None
-    
+
     # Rich metadata fields
     function_signature: str | None = None
     class_name: str | None = None

@@ -1,10 +1,9 @@
+import json
+import logging
 import math
 import re
-import logging
-from collections import defaultdict, Counter
-from typing import Dict, List, Set, Tuple
 import sqlite3
-import json
+from collections import Counter, defaultdict
 from pathlib import Path
 
 from ..models.indexing_models import CodeChunk
@@ -53,7 +52,7 @@ class BM25SearchEngine:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_bm25_term ON bm25_index(term)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_doc_stats ON document_stats(document_id)")
 
-    async def build_index(self, chunks: List[CodeChunk]) -> None:
+    async def build_index(self, chunks: list[CodeChunk]) -> None:
         """Build BM25 inverted index from code chunks."""
         logger.info(f"Building BM25 index for {len(chunks)} chunks...")
         
@@ -116,7 +115,7 @@ class BM25SearchEngine:
 
         logger.info(f"BM25 index built with {len(term_doc_frequencies)} unique terms")
 
-    async def search(self, query: str, language: str = None, max_results: int = 50) -> List[Tuple[str, float]]:
+    async def search(self, query: str, language: str = None, max_results: int = 50) -> list[tuple[str, float]]:
         """Search using BM25 algorithm."""
         query_terms = self._tokenize_query(query, language)
         if not query_terms:
@@ -190,12 +189,12 @@ class BM25SearchEngine:
         sorted_results = sorted(document_scores.items(), key=lambda x: x[1], reverse=True)
         return sorted_results[:max_results]
 
-    def _tokenize_code(self, content: str, language: str) -> List[str]:
+    def _tokenize_code(self, content: str, language: str) -> list[str]:
         """Tokenize code content for BM25 indexing."""
         tokenizer = CodeTokenizer()
         return tokenizer.tokenize(content, language)
 
-    def _tokenize_query(self, query: str, language: str = None) -> List[str]:
+    def _tokenize_query(self, query: str, language: str = None) -> list[str]:
         """Tokenize search query."""
         # Use same tokenization as code content
         return self._tokenize_code(query, language or "text")
@@ -215,7 +214,7 @@ class BM25SearchEngine:
         }
         return extension_map.get(path.suffix.lower(), "text")
 
-    async def update_index(self, added_chunks: List[CodeChunk], removed_doc_ids: List[str]) -> None:
+    async def update_index(self, added_chunks: list[CodeChunk], removed_doc_ids: list[str]) -> None:
         """Incrementally update BM25 index."""
         logger.info(f"Updating BM25 index: +{len(added_chunks)} chunks, -{len(removed_doc_ids)} docs")
         
@@ -245,7 +244,7 @@ class BM25SearchEngine:
         if added_chunks:
             await self._add_chunks_to_index(added_chunks)
 
-    async def _add_chunks_to_index(self, chunks: List[CodeChunk]) -> None:
+    async def _add_chunks_to_index(self, chunks: list[CodeChunk]) -> None:
         """Add new chunks to existing BM25 index."""
         with sqlite3.connect(self.db_path) as conn:
             for chunk in chunks:
@@ -313,7 +312,7 @@ class BM25SearchEngine:
                 ("average_document_length", str(avg_length))
             )
 
-    async def get_index_stats(self) -> Dict[str, any]:
+    async def get_index_stats(self) -> dict[str, any]:
         """Get BM25 index statistics."""
         if not self.db_path.exists():
             return {"indexed": False}
@@ -360,7 +359,7 @@ class CodeTokenizer:
             'rust': {'fn', 'let', 'mut', 'const', 'struct', 'enum', 'trait', 'impl', 'if', 'else', 'while', 'for', 'match', 'loop'}
         }
 
-    def tokenize(self, content: str, language: str = None) -> List[str]:
+    def tokenize(self, content: str, language: str = None) -> list[str]:
         """Advanced code-aware tokenization."""
         # Remove comments and strings to focus on code structure
         cleaned_content = self._remove_comments_and_strings(content, language)
@@ -392,7 +391,7 @@ class CodeTokenizer:
         
         return final_tokens
 
-    def _split_compound_identifier(self, identifier: str) -> List[str]:
+    def _split_compound_identifier(self, identifier: str) -> list[str]:
         """Split camelCase, snake_case, and kebab-case identifiers."""
         tokens = []
         
