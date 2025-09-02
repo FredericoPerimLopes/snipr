@@ -368,7 +368,7 @@ class SearchService:
             chunks = []
             conn = sqlite3.connect(str(self.db_path))
 
-            for doc_id, score in bm25_results:
+            for doc_id, _ in bm25_results:
                 # Parse document ID to get file_path and start_line
                 file_path, start_line_str = doc_id.rsplit(':', 1)
                 start_line = int(start_line_str)

@@ -1,7 +1,7 @@
 import logging
-from typing import List, Dict, Optional, Tuple
-from tree_sitter import Node, Parser
 from dataclasses import dataclass
+
+from tree_sitter import Node, Parser
 
 from ..models.indexing_models import CodeChunk
 from .metadata_extractor import MetadataExtractor
@@ -31,7 +31,7 @@ class SyntacticChunker:
         content: str, 
         language: str,
         parser: Parser
-    ) -> List[CodeChunk]:
+    ) -> list[CodeChunk]:
         """Main chunking method that preserves syntactic boundaries."""
         try:
             tree = parser.parse(content.encode())
@@ -56,7 +56,7 @@ class SyntacticChunker:
         content: str, 
         file_path: str, 
         language: str
-    ) -> List[CodeChunk]:
+    ) -> list[CodeChunk]:
         """Extract chunks while preserving syntactic boundaries."""
         chunks = []
         
@@ -104,7 +104,7 @@ class SyntacticChunker:
         content: str, 
         file_path: str, 
         language: str
-    ) -> Optional[CodeChunk]:
+    ) -> CodeChunk | None:
         """Create a CodeChunk from a Tree-sitter node with metadata."""
         try:
             lines = content.split('\n')
@@ -151,7 +151,7 @@ class SyntacticChunker:
         content: str, 
         file_path: str, 
         language: str
-    ) -> List[CodeChunk]:
+    ) -> list[CodeChunk]:
         """Recursively split large nodes while preserving syntax."""
         chunks = []
         
@@ -175,7 +175,7 @@ class SyntacticChunker:
         
         return chunks
 
-    async def _group_children_by_size(self, children: List[Node], content: str) -> List[List[Node]]:
+    async def _group_children_by_size(self, children: list[Node], content: str) -> list[list[Node]]:
         """Group child nodes to fit within chunk size limits."""
         groups = []
         current_group = []
@@ -209,11 +209,11 @@ class SyntacticChunker:
 
     async def _create_merged_chunk(
         self, 
-        nodes: List[Node], 
+        nodes: list[Node], 
         content: str, 
         file_path: str, 
         language: str
-    ) -> Optional[CodeChunk]:
+    ) -> CodeChunk | None:
         """Create a chunk from multiple adjacent nodes."""
         if not nodes:
             return None
@@ -249,7 +249,7 @@ class SyntacticChunker:
             logger.debug(f"Error creating merged chunk: {e}")
             return None
 
-    async def _get_dominant_semantic_type(self, nodes: List[Node], content: str, language: str) -> str:
+    async def _get_dominant_semantic_type(self, nodes: list[Node], content: str, language: str) -> str:
         """Determine the dominant semantic type for a group of nodes."""
         # Priority order for semantic types
         priority_map = {
@@ -272,7 +272,7 @@ class SyntacticChunker:
         
         return dominant_type
 
-    async def _optimize_chunks(self, chunks: List[CodeChunk], content: str) -> List[CodeChunk]:
+    async def _optimize_chunks(self, chunks: list[CodeChunk], content: str) -> list[CodeChunk]:
         """Optimize chunks by merging small adjacent chunks and adding context."""
         if not chunks:
             return chunks
@@ -303,7 +303,7 @@ class SyntacticChunker:
         
         return optimized
 
-    async def _try_merge_chunks(self, chunk1: CodeChunk, chunk2: CodeChunk, content: str) -> Optional[CodeChunk]:
+    async def _try_merge_chunks(self, chunk1: CodeChunk, chunk2: CodeChunk, content: str) -> CodeChunk | None:
         """Try to merge two adjacent chunks if beneficial."""
         # Only merge chunks from same file
         if chunk1.file_path != chunk2.file_path:

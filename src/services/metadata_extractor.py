@@ -240,7 +240,7 @@ class MetadataExtractor:
                             for expr_child in stmt_child.children:
                                 if expr_child.type == "string":
                                     docstring = content[expr_child.start_byte:expr_child.end_byte]
-                                    return docstring.strip().strip('"""').strip("'''")
+                                    return docstring.strip().replace('"""', '').replace("'''", '')
             return None
         except Exception:
             return None
@@ -594,13 +594,13 @@ class MetadataExtractor:
                         dependencies.append(module)
                 elif language in ["javascript", "typescript"]:
                     if 'from ' in import_stmt:
-                        module = import_stmt.split('from ')[1].strip().strip("'\"")
+                        module = import_stmt.split('from ')[1].strip().replace("'", '').replace('"', '')
                         dependencies.append(module)
                     elif 'require(' in import_stmt:
                         start = import_stmt.find('require(') + 8
                         end = import_stmt.find(')', start)
                         if end > start:
-                            module = import_stmt[start:end].strip("'\"")
+                            module = import_stmt[start:end].replace("'", '').replace('"', '')
                             dependencies.append(module)
 
             return list(set(dependencies)) if dependencies else None
