@@ -192,11 +192,10 @@ class SearchService:
                 conn.execute(
                     """
                     INSERT OR REPLACE INTO embeddings
-                    (file_path, content, start_line, end_line, language,
-                     semantic_type, embedding, content_hash, function_signature,
-                     class_name, function_name, parameter_types, return_type,
-                     inheritance_chain, import_statements, docstring, complexity_score,
-                     dependencies, interfaces, decorators)
+                    (file_path, content, start_line, end_line, language, semantic_type,
+                     embedding, content_hash, function_signature, class_name, function_name,
+                     parameter_types, return_type, inheritance_chain, import_statements,
+                     docstring, complexity_score, dependencies, interfaces, decorators)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                     (
@@ -302,6 +301,7 @@ class SearchService:
                         dependencies = json.loads(row[16]) if row[16] else None
                         interfaces = json.loads(row[17]) if row[17] else None
                         decorators = json.loads(row[18]) if row[18] else None
+
                         chunk = CodeChunk(
                             file_path=row[0],
                             content=row[1],
@@ -461,7 +461,7 @@ class SearchService:
                 dependencies = json.loads(row[15]) if row[15] else None
                 interfaces = json.loads(row[16]) if row[16] else None
                 decorators = json.loads(row[17]) if row[17] else None
-                
+
                 chunk = CodeChunk(
                     file_path=row[0],
                     content=row[1],
