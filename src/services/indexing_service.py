@@ -288,15 +288,15 @@ class IndexingService:
         """Basic line-based chunking for unsupported languages."""
         lines = content.split('\n')
         chunks = []
-        
+
         chunk_size = 15  # lines per chunk
         overlap = 3     # overlapping lines
-        
+
         for i in range(0, len(lines), chunk_size - overlap):
             end_idx = min(i + chunk_size, len(lines))
             chunk_lines = lines[i:end_idx]
             chunk_content = '\n'.join(chunk_lines)
-            
+
             if chunk_content.strip():  # Skip empty chunks
                 chunk = CodeChunk(
                     file_path=str(file_path),
@@ -307,7 +307,7 @@ class IndexingService:
                     semantic_type="code_block",
                 )
                 chunks.append(chunk)
-        
+
         return chunks
 
     async def _hybrid_chunking(self, file_path: Path, content: str, language: str) -> list[CodeChunk]:
@@ -415,7 +415,7 @@ class IndexingService:
             if not chunks:
                 # Extract file-level metadata for fallback chunk
                 file_metadata = await self.metadata_extractor.extract_file_level_metadata(file_path, text)
-                
+
                 chunk = CodeChunk(
                     file_path=file_path,
                     content=text,
