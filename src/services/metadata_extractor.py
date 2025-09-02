@@ -1,6 +1,4 @@
-import ast
 import logging
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -22,24 +20,24 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ExtractedMetadata:
     semantic_type: str
-    function_signature: Optional[str] = None
-    class_name: Optional[str] = None
-    function_name: Optional[str] = None
-    parameter_types: Optional[List[str]] = None
-    return_type: Optional[str] = None
-    inheritance_chain: Optional[List[str]] = None
-    import_statements: Optional[List[str]] = None
-    docstring: Optional[str] = None
-    complexity_score: Optional[int] = None
-    dependencies: Optional[List[str]] = None
-    interfaces: Optional[List[str]] = None
-    decorators: Optional[List[str]] = None
+    function_signature: str | None = None
+    class_name: str | None = None
+    function_name: str | None = None
+    parameter_types: list[str] | None = None
+    return_type: str | None = None
+    inheritance_chain: list[str] | None = None
+    import_statements: list[str] | None = None
+    docstring: str | None = None
+    complexity_score: int | None = None
+    dependencies: list[str] | None = None
+    interfaces: list[str] | None = None
+    decorators: list[str] | None = None
 
 
 class MetadataExtractor:
     def __init__(self):
-        self.parsers: Dict[str, Parser] = {}
-        self.languages: Dict[str, Language] = {}
+        self.parsers: dict[str, Parser] = {}
+        self.languages: dict[str, Language] = {}
         self._init_parsers()
 
     def _init_parsers(self) -> None:

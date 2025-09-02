@@ -28,9 +28,6 @@ class HybridSearchService:
         start_time = asyncio.get_event_loop().time()
 
         try:
-            # Detect query type for intelligent routing
-            query_type = self._detect_query_type(request.query)
-
             # Run searches in parallel
             search_tasks = [
                 self._run_bm25_search(request),

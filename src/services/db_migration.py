@@ -1,6 +1,6 @@
-import sqlite3
 import logging
-from pathlib import Path
+import sqlite3
+
 from ..config import get_settings
 
 logger = logging.getLogger(__name__)
