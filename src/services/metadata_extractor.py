@@ -158,18 +158,18 @@ class MetadataExtractor:
 
         metadata.import_statements = self._extract_import_statements(content, "rust")
 
-    def _get_node_text(self, node: Node, child_type: str, content: str) -> Optional[str]:
+    def _get_node_text(self, node: Node, child_type: str, content: str) -> str | None:
         """Get text content of a specific child node type."""
         for child in node.children:
             if child.type == child_type:
                 return content[child.start_byte:child.end_byte]
         return None
 
-    def _extract_python_function_signature(self, node: Node, content: str) -> Optional[str]:
+    def _extract_python_function_signature(self, node: Node, content: str) -> str | None:
         """Extract complete Python function signature."""
         try:
             sig_parts = []
-            
+
             # Function name
             name = self._get_node_text(node, "identifier", content)
             if name:
@@ -190,7 +190,7 @@ class MetadataExtractor:
         except Exception:
             return None
 
-    def _extract_python_parameter_types(self, node: Node, content: str) -> Optional[List[str]]:
+    def _extract_python_parameter_types(self, node: Node, content: str) -> list[str] | None:
         """Extract parameter type annotations."""
         try:
             param_types = []
@@ -207,7 +207,7 @@ class MetadataExtractor:
         except Exception:
             return None
 
-    def _extract_python_return_type(self, node: Node, content: str) -> Optional[str]:
+    def _extract_python_return_type(self, node: Node, content: str) -> str | None:
         """Extract return type annotation."""
         try:
             for child in node.children:
@@ -217,7 +217,7 @@ class MetadataExtractor:
         except Exception:
             return None
 
-    def _extract_python_decorators(self, node: Node, content: str) -> Optional[List[str]]:
+    def _extract_python_decorators(self, node: Node, content: str) -> list[str] | None:
         """Extract decorator names."""
         try:
             decorators = []
@@ -229,7 +229,7 @@ class MetadataExtractor:
         except Exception:
             return None
 
-    def _extract_python_docstring(self, node: Node, content: str) -> Optional[str]:
+    def _extract_python_docstring(self, node: Node, content: str) -> str | None:
         """Extract docstring from function or class."""
         try:
             # Look for string literal as first statement in function/class body
@@ -245,7 +245,7 @@ class MetadataExtractor:
         except Exception:
             return None
 
-    def _extract_python_inheritance(self, node: Node, content: str) -> Optional[List[str]]:
+    def _extract_python_inheritance(self, node: Node, content: str) -> list[str] | None:
         """Extract base class names from class definition."""
         try:
             inheritance = []
@@ -259,12 +259,12 @@ class MetadataExtractor:
         except Exception:
             return None
 
-    def _extract_js_function_signature(self, node: Node, content: str) -> Optional[str]:
+    def _extract_js_function_signature(self, node: Node, content: str) -> str | None:
         """Extract JavaScript/TypeScript function signature."""
         try:
             start_byte = node.start_byte
             end_byte = node.end_byte
-            
+
             # Find the opening brace to get just the signature
             node_text = content[start_byte:end_byte]
             brace_index = node_text.find('{')
@@ -274,11 +274,11 @@ class MetadataExtractor:
         except Exception:
             return None
 
-    def _extract_js_parameter_types(self, node: Node, content: str) -> Optional[List[str]]:
+    def _extract_js_parameter_types(self, node: Node, content: str) -> list[str] | None:
         """Extract TypeScript parameter types."""
         if "typescript" not in str(type(node)):
             return None
-        
+
         try:
             param_types = []
             for child in node.children:
@@ -294,7 +294,7 @@ class MetadataExtractor:
         except Exception:
             return None
 
-    def _extract_js_return_type(self, node: Node, content: str) -> Optional[str]:
+    def _extract_js_return_type(self, node: Node, content: str) -> str | None:
         """Extract TypeScript return type."""
         try:
             for child in node.children:
@@ -304,7 +304,7 @@ class MetadataExtractor:
         except Exception:
             return None
 
-    def _extract_js_inheritance(self, node: Node, content: str) -> Optional[List[str]]:
+    def _extract_js_inheritance(self, node: Node, content: str) -> list[str] | None:
         """Extract extends/implements from class."""
         try:
             inheritance = []
@@ -318,11 +318,11 @@ class MetadataExtractor:
         except Exception:
             return None
 
-    def _extract_java_method_signature(self, node: Node, content: str) -> Optional[str]:
+    def _extract_java_method_signature(self, node: Node, content: str) -> str | None:
         """Extract Java method signature."""
         try:
             sig_parts = []
-            
+
             # Modifiers
             modifiers = []
             for child in node.children:
@@ -356,7 +356,7 @@ class MetadataExtractor:
         except Exception:
             return None
 
-    def _extract_java_parameter_types(self, node: Node, content: str) -> Optional[List[str]]:
+    def _extract_java_parameter_types(self, node: Node, content: str) -> list[str] | None:
         """Extract Java parameter types."""
         try:
             param_types = []
@@ -374,7 +374,7 @@ class MetadataExtractor:
         except Exception:
             return None
 
-    def _extract_java_return_type(self, node: Node, content: str) -> Optional[str]:
+    def _extract_java_return_type(self, node: Node, content: str) -> str | None:
         """Extract Java return type."""
         try:
             for child in node.children:
@@ -384,7 +384,7 @@ class MetadataExtractor:
         except Exception:
             return None
 
-    def _extract_java_inheritance(self, node: Node, content: str) -> Optional[List[str]]:
+    def _extract_java_inheritance(self, node: Node, content: str) -> list[str] | None:
         """Extract Java inheritance (extends)."""
         try:
             inheritance = []
@@ -398,7 +398,7 @@ class MetadataExtractor:
         except Exception:
             return None
 
-    def _extract_java_interfaces(self, node: Node, content: str) -> Optional[List[str]]:
+    def _extract_java_interfaces(self, node: Node, content: str) -> list[str] | None:
         """Extract Java interfaces (implements)."""
         try:
             interfaces = []
@@ -412,14 +412,14 @@ class MetadataExtractor:
         except Exception:
             return None
 
-    def _extract_go_function_signature(self, node: Node, content: str) -> Optional[str]:
+    def _extract_go_function_signature(self, node: Node, content: str) -> str | None:
         """Extract Go function signature."""
         try:
             return content[node.start_byte:node.end_byte].split('{')[0].strip()
         except Exception:
             return None
 
-    def _extract_go_parameter_types(self, node: Node, content: str) -> Optional[List[str]]:
+    def _extract_go_parameter_types(self, node: Node, content: str) -> list[str] | None:
         """Extract Go parameter types."""
         try:
             param_types = []
@@ -436,7 +436,7 @@ class MetadataExtractor:
         except Exception:
             return None
 
-    def _extract_go_return_type(self, node: Node, content: str) -> Optional[str]:
+    def _extract_go_return_type(self, node: Node, content: str) -> str | None:
         """Extract Go return type."""
         try:
             for child in node.children:
@@ -446,14 +446,14 @@ class MetadataExtractor:
         except Exception:
             return None
 
-    def _extract_rust_function_signature(self, node: Node, content: str) -> Optional[str]:
+    def _extract_rust_function_signature(self, node: Node, content: str) -> str | None:
         """Extract Rust function signature."""
         try:
             return content[node.start_byte:node.end_byte].split('{')[0].strip()
         except Exception:
             return None
 
-    def _extract_rust_parameter_types(self, node: Node, content: str) -> Optional[List[str]]:
+    def _extract_rust_parameter_types(self, node: Node, content: str) -> list[str] | None:
         """Extract Rust parameter types."""
         try:
             param_types = []
@@ -470,7 +470,7 @@ class MetadataExtractor:
         except Exception:
             return None
 
-    def _extract_rust_return_type(self, node: Node, content: str) -> Optional[str]:
+    def _extract_rust_return_type(self, node: Node, content: str) -> str | None:
         """Extract Rust return type."""
         try:
             for child in node.children:
@@ -480,12 +480,12 @@ class MetadataExtractor:
         except Exception:
             return None
 
-    def _extract_import_statements(self, content: str, language: str) -> Optional[List[str]]:
+    def _extract_import_statements(self, content: str, language: str) -> list[str] | None:
         """Extract import statements from file content."""
         try:
             imports = []
             lines = content.split('\n')
-            
+
             if language == "python":
                 for line in lines:
                     stripped = line.strip()
@@ -511,19 +511,19 @@ class MetadataExtractor:
                     stripped = line.strip()
                     if stripped.startswith('use '):
                         imports.append(stripped)
-                        
+
             return imports if imports else None
         except Exception:
             return None
 
-    def _calculate_complexity(self, node: Node) -> Optional[int]:
+    def _calculate_complexity(self, node: Node) -> int | None:
         """Calculate cyclomatic complexity for a function."""
         try:
             complexity = 1  # Base complexity
 
             # Count decision points
             decision_types = {
-                "if_statement", "while_statement", "for_statement", "case_clause", 
+                "if_statement", "while_statement", "for_statement", "case_clause",
                 "catch_clause", "conditional_expression", "logical_and", "logical_or",
                 "switch_statement", "try_statement"
             }
@@ -567,7 +567,7 @@ class MetadataExtractor:
                     file_metadata["total_functions"] += 1
                 elif node.type in ["class_definition", "class_declaration"]:
                     file_metadata["total_classes"] += 1
-                    
+
                 for child in node.children:
                     count_constructs(child)
 
@@ -578,12 +578,12 @@ class MetadataExtractor:
             logger.error(f"Error extracting file metadata for {file_path}: {e}")
             return {}
 
-    def _extract_dependencies(self, content: str, language: str) -> Optional[List[str]]:
+    def _extract_dependencies(self, content: str, language: str) -> list[str] | None:
         """Extract external dependencies from imports."""
         try:
             dependencies = []
             imports = self._extract_import_statements(content, language) or []
-            
+
             for import_stmt in imports:
                 if language == "python":
                     if import_stmt.startswith('import '):
@@ -612,7 +612,7 @@ class MetadataExtractor:
         path = Path(file_path)
         extension_map = {
             ".py": "python",
-            ".js": "javascript", 
+            ".js": "javascript",
             ".jsx": "javascript",
             ".ts": "typescript",
             ".tsx": "typescript",
