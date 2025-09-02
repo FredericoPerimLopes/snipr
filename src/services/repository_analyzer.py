@@ -125,8 +125,12 @@ class RepositoryAnalyzer:
 
         graph = ModuleGraph()
 
-        # Get all chunks from database
-        chunks = await self._get_all_chunks()
+        try:
+            # Get all chunks from database
+            chunks = await self._get_all_chunks()
+        except Exception as e:
+            logger.error(f"Error getting chunks for module graph: {e}")
+            return graph
 
         # Build nodes for files, classes, and functions
         file_nodes = {}
@@ -653,10 +657,15 @@ class ContextualReranker:
     def _calculate_call_relevance(self, content: str, query: str) -> float:
         """Calculate relevance based on function calls in content."""
         query_words = set(query.lower().split())
-        content_words = set(content.lower().split())
-
-        overlap = query_words.intersection(content_words)
-        return len(overlap) / len(query_words) if query_words else 0.0
+        content_lower = content.lower()
+        
+        # Count matches using substring matching
+        matches = 0
+        for query_word in query_words:
+            if query_word in content_lower:
+                matches += 1
+        
+        return matches / len(query_words) if query_words else 0.0
 
     async def _calculate_cluster_similarity(self, chunk: CodeChunk, graph: ModuleGraph) -> float:
         """Calculate similarity based on module clustering."""

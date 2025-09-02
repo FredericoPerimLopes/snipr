@@ -1,3 +1,4 @@
+import asyncio
 import pytest
 from pathlib import Path
 from unittest.mock import AsyncMock, Mock, patch

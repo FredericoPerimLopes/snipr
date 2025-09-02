@@ -360,9 +360,10 @@ class CodeRetrievalMetrics:
         query_lower = query.lower()
         content_lower = chunk.content.lower()
 
-        # Basic keyword overlap scoring
-        query_words = set(query_lower.split())
-        content_words = set(content_lower.split())
+        # Basic keyword overlap scoring with better tokenization
+        import re
+        query_words = set(re.findall(r'\b\w+\b', query_lower))
+        content_words = set(re.findall(r'\b\w+\b', content_lower))
 
         overlap = query_words.intersection(content_words)
         if not query_words:
@@ -370,14 +371,35 @@ class CodeRetrievalMetrics:
 
         keyword_score = len(overlap) / len(query_words)
 
-        # Boost score for metadata matches
+        # Boost score for metadata matches (substring matching)
         metadata_boost = 0.0
-        if chunk.function_name and any(word in chunk.function_name.lower() for word in query_words):
-            metadata_boost += 0.3
-        if chunk.class_name and any(word in chunk.class_name.lower() for word in query_words):
-            metadata_boost += 0.3
-        if chunk.docstring and any(word in chunk.docstring.lower() for word in query_words):
-            metadata_boost += 0.2
+        if chunk.function_name:
+            function_lower = chunk.function_name.lower()
+            for word in query_words:
+                if word in function_lower or function_lower in word:
+                    metadata_boost += 0.4  # Increased boost for function name matches
+                # Also check for root word matches (like "authenticate" vs "authentication")
+                elif len(word) > 4:
+                    for part in function_lower.split('_'):
+                        if len(part) > 4:
+                            # Check if they share a common root (first 70% of characters)
+                            min_len = min(len(word), len(part))
+                            root_len = max(4, int(min_len * 0.7))
+                            if word[:root_len] == part[:root_len]:
+                                metadata_boost += 0.2  # Root match bonus
+                                break
+        if chunk.class_name:
+            class_lower = chunk.class_name.lower()
+            for word in query_words:
+                if word in class_lower or class_lower in word:
+                    metadata_boost += 0.3
+                    break
+        if chunk.docstring:
+            docstring_lower = chunk.docstring.lower()
+            for word in query_words:
+                if word in docstring_lower:
+                    metadata_boost += 0.2
+                    break
 
         return min(1.0, keyword_score + metadata_boost)
 
@@ -580,8 +602,9 @@ class PerformanceBenchmark:
             return 0.0
 
         sorted_values = sorted(values)
-        index = int((percentile / 100) * len(sorted_values))
-        return sorted_values[min(index, len(sorted_values) - 1)]
+        # Use (percentile/100) * (len-1) to get the expected behavior
+        index = int((percentile / 100) * (len(sorted_values) - 1))
+        return sorted_values[index]
 
 
 class SearchQualityDashboard:
