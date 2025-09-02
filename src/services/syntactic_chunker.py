@@ -27,11 +27,7 @@ class SyntacticChunker:
         self.metadata_extractor = MetadataExtractor()
 
     async def chunk_with_integrity(
-        self,
-        file_path: str,
-        content: str,
-        language: str,
-        parser: Parser
+        self, file_path: str, content: str, language: str, parser: Parser
     ) -> list[CodeChunk]:
         """Main chunking method that preserves syntactic boundaries."""
         try:
@@ -52,11 +48,7 @@ class SyntacticChunker:
             return []
 
     async def _extract_syntactic_chunks(
-        self,
-        node: Node,
-        content: str,
-        file_path: str,
-        language: str
+        self, node: Node, content: str, file_path: str, language: str
     ) -> list[CodeChunk]:
         """Extract chunks while preserving syntactic boundaries."""
         chunks = []
@@ -86,29 +78,33 @@ class SyntacticChunker:
         """Determine if a node represents a meaningful chunk boundary."""
         # Nodes that represent complete semantic units
         chunkable_types = {
-            'function_definition', 'async_function_definition', 'method_definition',
-            'class_definition', 'class_declaration', 'interface_declaration',
-            'constructor_definition', 'struct_declaration', 'enum_declaration',
-            'type_alias_declaration', 'variable_declaration', 'const_declaration'
+            "function_definition",
+            "async_function_definition",
+            "method_definition",
+            "class_definition",
+            "class_declaration",
+            "interface_declaration",
+            "constructor_definition",
+            "struct_declaration",
+            "enum_declaration",
+            "type_alias_declaration",
+            "variable_declaration",
+            "const_declaration",
         }
 
         return node.type in chunkable_types
 
     def _get_node_char_count(self, node: Node, content: str) -> int:
         """Count non-whitespace characters in node."""
-        node_text = content[node.start_byte:node.end_byte]
-        return len(re.sub(r'\s', '', node_text))
+        node_text = content[node.start_byte : node.end_byte]
+        return len(re.sub(r"\s", "", node_text))
 
     async def _create_chunk_from_node(
-        self,
-        node: Node,
-        content: str,
-        file_path: str,
-        language: str
+        self, node: Node, content: str, file_path: str, language: str
     ) -> CodeChunk | None:
         """Create a CodeChunk from a Tree-sitter node with metadata."""
         try:
-            lines = content.split('\n')
+            lines = content.split("\n")
             start_line = node.start_point[0]
             end_line = node.end_point[0]
 
@@ -116,7 +112,7 @@ class SyntacticChunker:
             context_start = max(0, start_line - 1)
             context_end = min(len(lines), end_line + 2)
 
-            chunk_content = '\n'.join(lines[context_start:context_end])
+            chunk_content = "\n".join(lines[context_start:context_end])
 
             # Extract metadata
             metadata = await self.metadata_extractor.extract_all_metadata(node, content, language)
@@ -146,13 +142,7 @@ class SyntacticChunker:
             logger.debug(f"Error creating chunk from node: {e}")
             return None
 
-    async def _recursive_chunk_split(
-        self,
-        node: Node,
-        content: str,
-        file_path: str,
-        language: str
-    ) -> list[CodeChunk]:
+    async def _recursive_chunk_split(self, node: Node, content: str, file_path: str, language: str) -> list[CodeChunk]:
         """Recursively split large nodes while preserving syntax."""
         chunks = []
 
@@ -162,15 +152,11 @@ class SyntacticChunker:
         for child_group in child_groups:
             if len(child_group) == 1:
                 # Single child - recurse
-                child_chunks = await self._extract_syntactic_chunks(
-                    child_group[0], content, file_path, language
-                )
+                child_chunks = await self._extract_syntactic_chunks(child_group[0], content, file_path, language)
                 chunks.extend(child_chunks)
             else:
                 # Multiple children that fit together
-                merged_chunk = await self._create_merged_chunk(
-                    child_group, content, file_path, language
-                )
+                merged_chunk = await self._create_merged_chunk(child_group, content, file_path, language)
                 if merged_chunk:
                     chunks.append(merged_chunk)
 
@@ -209,11 +195,7 @@ class SyntacticChunker:
         return groups
 
     async def _create_merged_chunk(
-        self,
-        nodes: list[Node],
-        content: str,
-        file_path: str,
-        language: str
+        self, nodes: list[Node], content: str, file_path: str, language: str
     ) -> CodeChunk | None:
         """Create a chunk from multiple adjacent nodes."""
         if not nodes:
@@ -224,7 +206,7 @@ class SyntacticChunker:
             _ = min(node.start_byte for node in nodes)
             _ = max(node.end_byte for node in nodes)
 
-            lines = content.split('\n')
+            lines = content.split("\n")
             start_line = min(node.start_point[0] for node in nodes)
             end_line = max(node.end_point[0] for node in nodes)
 
@@ -232,7 +214,7 @@ class SyntacticChunker:
             context_start = max(0, start_line - 1)
             context_end = min(len(lines), end_line + 2)
 
-            chunk_content = '\n'.join(lines[context_start:context_end])
+            chunk_content = "\n".join(lines[context_start:context_end])
 
             # Determine dominant semantic type
             semantic_type = await self._get_dominant_semantic_type(nodes, content, language)
@@ -254,16 +236,22 @@ class SyntacticChunker:
         """Determine the dominant semantic type for a group of nodes."""
         # Priority order for semantic types
         priority_map = {
-            'class_definition': 10, 'class_declaration': 10,
-            'function_definition': 8, 'async_function_definition': 8,
-            'method_definition': 7, 'constructor_definition': 7,
-            'interface_declaration': 6, 'struct_declaration': 6,
-            'variable_declaration': 4, 'const_declaration': 4,
-            'import_statement': 2, 'import_declaration': 2
+            "class_definition": 10,
+            "class_declaration": 10,
+            "function_definition": 8,
+            "async_function_definition": 8,
+            "method_definition": 7,
+            "constructor_definition": 7,
+            "interface_declaration": 6,
+            "struct_declaration": 6,
+            "variable_declaration": 4,
+            "const_declaration": 4,
+            "import_statement": 2,
+            "import_declaration": 2,
         }
 
         highest_priority = 0
-        dominant_type = 'code_block'
+        dominant_type = "code_block"
 
         for node in nodes:
             priority = priority_map.get(node.type, 1)
@@ -285,9 +273,7 @@ class SyntacticChunker:
             current_chunk = chunks[i]
 
             # Check if current chunk is too small and can be merged
-            if (len(current_chunk.content) < self.config.min_chunk_chars and
-                i + 1 < len(chunks)):
-
+            if len(current_chunk.content) < self.config.min_chunk_chars and i + 1 < len(chunks):
                 # Try to merge with next chunk
                 next_chunk = chunks[i + 1]
                 merged = await self._try_merge_chunks(current_chunk, next_chunk, content)
@@ -310,15 +296,25 @@ class SyntacticChunker:
         if chunk1.file_path != chunk2.file_path:
             return None
 
+        # Don't merge distinct semantic constructs (function with class, etc.)
+        distinct_types = {
+            "function_definition", "class_definition", "interface_declaration", 
+            "method_definition", "constructor_definition"
+        }
+        if (chunk1.semantic_type in distinct_types and 
+            chunk2.semantic_type in distinct_types and 
+            chunk1.semantic_type != chunk2.semantic_type):
+            return None
+
         # Check if chunks are adjacent or nearly adjacent
         if abs(chunk1.end_line - chunk2.start_line) > 3:
             return None
 
         # Check merged size
-        lines = content.split('\n')
+        lines = content.split("\n")
         merged_start = min(chunk1.start_line, chunk2.start_line) - 1
         merged_end = max(chunk1.end_line, chunk2.end_line)
-        merged_content = '\n'.join(lines[merged_start:merged_end])
+        merged_content = "\n".join(lines[merged_start:merged_end])
 
         if len(merged_content) > self.config.max_merge_size:
             return None
@@ -344,10 +340,7 @@ class SyntacticChunker:
         if type1 == type2:
             return type1
 
-        priority = {
-            'class_definition': 10, 'function_definition': 8,
-            'method_definition': 7, 'variable_declaration': 4
-        }
+        priority = {"class_definition": 10, "function_definition": 8, "method_definition": 7, "variable_declaration": 4}
 
         priority1 = priority.get(type1, 1)
         priority2 = priority.get(type2, 1)
