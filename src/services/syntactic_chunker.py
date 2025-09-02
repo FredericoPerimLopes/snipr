@@ -1,4 +1,5 @@
 import logging
+import re
 from dataclasses import dataclass
 
 from tree_sitter import Node, Parser
@@ -20,15 +21,15 @@ class ChunkingConfig:
 
 class SyntacticChunker:
     """cAST-inspired chunking that preserves syntactic integrity."""
-    
+
     def __init__(self, config: ChunkingConfig = None):
         self.config = config or ChunkingConfig()
         self.metadata_extractor = MetadataExtractor()
 
     async def chunk_with_integrity(
-        self, 
+        self,
         file_path: str,
-        content: str, 
+        content: str,
         language: str,
         parser: Parser
     ) -> list[CodeChunk]:
@@ -36,13 +37,13 @@ class SyntacticChunker:
         try:
             tree = parser.parse(content.encode())
             root_node = tree.root_node
-            
+
             # Extract chunks with syntactic integrity
             raw_chunks = await self._extract_syntactic_chunks(root_node, content, file_path, language)
-            
+
             # Apply merging and optimization
             optimized_chunks = await self._optimize_chunks(raw_chunks, content)
-            
+
             logger.debug(f"Syntactic chunking: {len(raw_chunks)} -> {len(optimized_chunks)} chunks")
             return optimized_chunks
 
@@ -51,19 +52,19 @@ class SyntacticChunker:
             return []
 
     async def _extract_syntactic_chunks(
-        self, 
-        node: Node, 
-        content: str, 
-        file_path: str, 
+        self,
+        node: Node,
+        content: str,
+        file_path: str,
         language: str
     ) -> list[CodeChunk]:
         """Extract chunks while preserving syntactic boundaries."""
         chunks = []
-        
+
         # Check if current node is suitable for chunking
         if await self._is_chunkable_node(node, content):
             node_size = self._get_node_char_count(node, content)
-            
+
             if node_size <= self.config.max_chunk_chars:
                 # Node fits in single chunk
                 chunk = await self._create_chunk_from_node(node, content, file_path, language)
@@ -90,7 +91,7 @@ class SyntacticChunker:
             'constructor_definition', 'struct_declaration', 'enum_declaration',
             'type_alias_declaration', 'variable_declaration', 'const_declaration'
         }
-        
+
         return node.type in chunkable_types
 
     def _get_node_char_count(self, node: Node, content: str) -> int:
@@ -99,10 +100,10 @@ class SyntacticChunker:
         return len(re.sub(r'\s', '', node_text))
 
     async def _create_chunk_from_node(
-        self, 
-        node: Node, 
-        content: str, 
-        file_path: str, 
+        self,
+        node: Node,
+        content: str,
+        file_path: str,
         language: str
     ) -> CodeChunk | None:
         """Create a CodeChunk from a Tree-sitter node with metadata."""
@@ -110,16 +111,16 @@ class SyntacticChunker:
             lines = content.split('\n')
             start_line = node.start_point[0]
             end_line = node.end_point[0]
-            
+
             # Add minimal context while preserving boundaries
             context_start = max(0, start_line - 1)
             context_end = min(len(lines), end_line + 2)
-            
+
             chunk_content = '\n'.join(lines[context_start:context_end])
-            
+
             # Extract metadata
             metadata = await self.metadata_extractor.extract_all_metadata(node, content, language)
-            
+
             return CodeChunk(
                 file_path=file_path,
                 content=chunk_content,
@@ -140,24 +141,24 @@ class SyntacticChunker:
                 interfaces=metadata.interfaces,
                 decorators=metadata.decorators,
             )
-            
+
         except Exception as e:
             logger.debug(f"Error creating chunk from node: {e}")
             return None
 
     async def _recursive_chunk_split(
-        self, 
-        node: Node, 
-        content: str, 
-        file_path: str, 
+        self,
+        node: Node,
+        content: str,
+        file_path: str,
         language: str
     ) -> list[CodeChunk]:
         """Recursively split large nodes while preserving syntax."""
         chunks = []
-        
+
         # Try to split at natural boundaries (direct children)
         child_groups = await self._group_children_by_size(node.children, content)
-        
+
         for child_group in child_groups:
             if len(child_group) == 1:
                 # Single child - recurse
@@ -172,7 +173,7 @@ class SyntacticChunker:
                 )
                 if merged_chunk:
                     chunks.append(merged_chunk)
-        
+
         return chunks
 
     async def _group_children_by_size(self, children: list[Node], content: str) -> list[list[Node]]:
@@ -180,10 +181,10 @@ class SyntacticChunker:
         groups = []
         current_group = []
         current_size = 0
-        
+
         for child in children:
             child_size = self._get_node_char_count(child, content)
-            
+
             if child_size > self.config.max_chunk_chars:
                 # Child too large - needs its own processing
                 if current_group:
@@ -201,41 +202,41 @@ class SyntacticChunker:
                     groups.append(current_group)
                 current_group = [child]
                 current_size = child_size
-        
+
         if current_group:
             groups.append(current_group)
-        
+
         return groups
 
     async def _create_merged_chunk(
-        self, 
-        nodes: list[Node], 
-        content: str, 
-        file_path: str, 
+        self,
+        nodes: list[Node],
+        content: str,
+        file_path: str,
         language: str
     ) -> CodeChunk | None:
         """Create a chunk from multiple adjacent nodes."""
         if not nodes:
             return None
-            
+
         try:
             # Get span of all nodes
-            start_byte = min(node.start_byte for node in nodes)
-            end_byte = max(node.end_byte for node in nodes)
-            
+            _ = min(node.start_byte for node in nodes)
+            _ = max(node.end_byte for node in nodes)
+
             lines = content.split('\n')
             start_line = min(node.start_point[0] for node in nodes)
             end_line = max(node.end_point[0] for node in nodes)
-            
+
             # Add minimal context
             context_start = max(0, start_line - 1)
             context_end = min(len(lines), end_line + 2)
-            
+
             chunk_content = '\n'.join(lines[context_start:context_end])
-            
+
             # Determine dominant semantic type
             semantic_type = await self._get_dominant_semantic_type(nodes, content, language)
-            
+
             return CodeChunk(
                 file_path=file_path,
                 content=chunk_content,
@@ -244,7 +245,7 @@ class SyntacticChunker:
                 language=language,
                 semantic_type=semantic_type,
             )
-            
+
         except Exception as e:
             logger.debug(f"Error creating merged chunk: {e}")
             return None
@@ -260,47 +261,47 @@ class SyntacticChunker:
             'variable_declaration': 4, 'const_declaration': 4,
             'import_statement': 2, 'import_declaration': 2
         }
-        
+
         highest_priority = 0
         dominant_type = 'code_block'
-        
+
         for node in nodes:
             priority = priority_map.get(node.type, 1)
             if priority > highest_priority:
                 highest_priority = priority
                 dominant_type = node.type
-        
+
         return dominant_type
 
     async def _optimize_chunks(self, chunks: list[CodeChunk], content: str) -> list[CodeChunk]:
         """Optimize chunks by merging small adjacent chunks and adding context."""
         if not chunks:
             return chunks
-            
+
         optimized = []
         i = 0
-        
+
         while i < len(chunks):
             current_chunk = chunks[i]
-            
+
             # Check if current chunk is too small and can be merged
-            if (len(current_chunk.content) < self.config.min_chunk_chars and 
+            if (len(current_chunk.content) < self.config.min_chunk_chars and
                 i + 1 < len(chunks)):
-                
+
                 # Try to merge with next chunk
                 next_chunk = chunks[i + 1]
                 merged = await self._try_merge_chunks(current_chunk, next_chunk, content)
-                
+
                 if merged:
                     optimized.append(merged)
                     i += 2  # Skip next chunk since it was merged
                     continue
-            
+
             # Add context to chunk if beneficial
             contextualized = await self._add_hierarchical_context(current_chunk, content)
             optimized.append(contextualized)
             i += 1
-        
+
         return optimized
 
     async def _try_merge_chunks(self, chunk1: CodeChunk, chunk2: CodeChunk, content: str) -> CodeChunk | None:
@@ -308,20 +309,20 @@ class SyntacticChunker:
         # Only merge chunks from same file
         if chunk1.file_path != chunk2.file_path:
             return None
-            
+
         # Check if chunks are adjacent or nearly adjacent
         if abs(chunk1.end_line - chunk2.start_line) > 3:
             return None
-            
+
         # Check merged size
         lines = content.split('\n')
         merged_start = min(chunk1.start_line, chunk2.start_line) - 1
         merged_end = max(chunk1.end_line, chunk2.end_line)
         merged_content = '\n'.join(lines[merged_start:merged_end])
-        
+
         if len(merged_content) > self.config.max_merge_size:
             return None
-        
+
         # Create merged chunk
         return CodeChunk(
             file_path=chunk1.file_path,
@@ -342,15 +343,15 @@ class SyntacticChunker:
         # Priority for merged types
         if type1 == type2:
             return type1
-        
+
         priority = {
             'class_definition': 10, 'function_definition': 8,
             'method_definition': 7, 'variable_declaration': 4
         }
-        
+
         priority1 = priority.get(type1, 1)
         priority2 = priority.get(type2, 1)
-        
+
         return type1 if priority1 >= priority2 else type2
 
     async def _add_hierarchical_context(self, chunk: CodeChunk, content: str) -> CodeChunk:

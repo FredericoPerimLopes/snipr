@@ -3,12 +3,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 try:
-    import tree_sitter_python as tspython
-    import tree_sitter_javascript as tsjs
-    import tree_sitter_typescript as tsts
     import tree_sitter_go as tsgo
-    import tree_sitter_rust as tsrust
     import tree_sitter_java as tsjava
+    import tree_sitter_javascript as tsjs
+    import tree_sitter_python as tspython
+    import tree_sitter_rust as tsrust
+    import tree_sitter_typescript as tsts
 except ImportError:
     tspython = tsjs = tsts = tsgo = tsrust = tsjava = None
 
