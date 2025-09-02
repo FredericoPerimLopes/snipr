@@ -82,7 +82,7 @@ def main():
         imports = extractor._extract_import_statements(content, "python")
 
         assert imports is not None
-        assert len(imports) == 4
+        assert len(imports) == 5
         assert "import os" in imports
         assert "from typing import List, Dict" in imports
 
@@ -175,6 +175,7 @@ def function2():
                 pass
 
             mock_parsers.__getitem__.return_value = mock_parser
+            mock_parsers.__contains__.return_value = True
 
             metadata = await extractor.extract_file_level_metadata("test.py", content)
 

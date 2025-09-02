@@ -54,7 +54,7 @@ class SyntacticChunker:
         chunks = []
 
         # Check if current node is suitable for chunking
-        if await self._is_chunkable_node(node, content):
+        if self._is_chunkable_node(node, content):
             node_size = self._get_node_char_count(node, content)
 
             if node_size <= self.config.max_chunk_chars:
@@ -74,7 +74,7 @@ class SyntacticChunker:
 
         return chunks
 
-    async def _is_chunkable_node(self, node: Node, content: str) -> bool:
+    def _is_chunkable_node(self, node: Node, content: str) -> bool:
         """Determine if a node represents a meaningful chunk boundary."""
         # Nodes that represent complete semantic units
         chunkable_types = {

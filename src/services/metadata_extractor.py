@@ -601,7 +601,7 @@ class MetadataExtractor:
                         dependencies.append(module)
                 elif language in ["javascript", "typescript"]:
                     if "from " in import_stmt:
-                        module = import_stmt.split("from ")[1].strip().replace("'", "").replace('"', "")
+                        module = import_stmt.split("from ")[1].strip().replace("'", "").replace('"', "").rstrip(";")
                         dependencies.append(module)
                     elif "require(" in import_stmt:
                         start = import_stmt.find("require(") + 8

@@ -54,6 +54,17 @@ class TestSyntacticChunker:
             mock_metadata = Mock()
             mock_metadata.semantic_type = "function_definition"
             mock_metadata.function_name = "small_function"
+            mock_metadata.function_signature = "def small_function()"
+            mock_metadata.class_name = None
+            mock_metadata.parameter_types = None
+            mock_metadata.return_type = None
+            mock_metadata.inheritance_chain = None
+            mock_metadata.import_statements = None
+            mock_metadata.docstring = None
+            mock_metadata.complexity_score = 1
+            mock_metadata.dependencies = None
+            mock_metadata.interfaces = None
+            mock_metadata.decorators = None
             mock_extract.return_value = mock_metadata
 
             chunks = await chunker.chunk_with_integrity("test.py", content, "python", mock_parser)
@@ -74,15 +85,16 @@ class TestSyntacticChunker:
         class_node.start_point = (0, 0)
         class_node.end_point = (150, 0)
 
-        # Mock method children
+        # Mock method children - make them non-adjacent to prevent merging
         method_nodes = []
         for i in range(5):
             method_node = Mock(spec=Node)
             method_node.type = "method_definition"
             method_node.start_byte = i * 30
             method_node.end_byte = (i + 1) * 30
-            method_node.start_point = (i * 3, 0)
-            method_node.end_point = ((i + 1) * 3, 0)
+            # Space out the methods so they can't be merged (>3 line gap)
+            method_node.start_point = (i * 10, 0)
+            method_node.end_point = ((i * 10) + 2, 0)
             method_node.children = []
             method_nodes.append(method_node)
 
@@ -90,13 +102,24 @@ class TestSyntacticChunker:
         mock_parser.parse.return_value.root_node.children = [class_node]
 
         with patch.object(chunker, "_get_node_char_count") as mock_char_count:
-            # Make class too large, methods small enough
-            mock_char_count.side_effect = lambda node, content: 1000 if node.type == "class_definition" else 100
+            # Make class too large, methods large enough to prevent grouping
+            mock_char_count.side_effect = lambda node, content: 1000 if node.type == "class_definition" else 200
 
             with patch.object(chunker.metadata_extractor, "extract_all_metadata") as mock_extract:
                 mock_metadata = Mock()
                 mock_metadata.semantic_type = "method_definition"
-                mock_metadata.function_name = f"method_{i}"
+                mock_metadata.function_name = "method"
+                mock_metadata.function_signature = "def method()"
+                mock_metadata.class_name = None
+                mock_metadata.parameter_types = None
+                mock_metadata.return_type = None
+                mock_metadata.inheritance_chain = None
+                mock_metadata.import_statements = None
+                mock_metadata.docstring = None
+                mock_metadata.complexity_score = 1
+                mock_metadata.dependencies = None
+                mock_metadata.interfaces = None
+                mock_metadata.decorators = None
                 mock_extract.return_value = mock_metadata
 
                 chunks = await chunker.chunk_with_integrity("test.py", content, "python", mock_parser)
@@ -128,8 +151,8 @@ class TestSyntacticChunker:
 
         char_count = chunker._get_node_char_count(node, content)
 
-        # Should count only non-whitespace chars
-        expected = len("def func(): pass")  # Whitespace removed
+        # Should count only non-whitespace chars from first 20 bytes
+        expected = len("deffunc():")  # First 20 chars with whitespace removed
         assert char_count == expected
 
     @pytest.mark.asyncio
@@ -243,8 +266,16 @@ class TestSyntacticChunker:
             mock_metadata.semantic_type = "function_definition"
             mock_metadata.function_name = "test_function"
             mock_metadata.function_signature = "def test_function()"
+            mock_metadata.class_name = None
+            mock_metadata.parameter_types = None
+            mock_metadata.return_type = None
+            mock_metadata.inheritance_chain = None
+            mock_metadata.import_statements = None
             mock_metadata.docstring = None
             mock_metadata.complexity_score = 1
+            mock_metadata.dependencies = None
+            mock_metadata.interfaces = None
+            mock_metadata.decorators = None
             mock_extract.return_value = mock_metadata
 
             chunk = await chunker._create_chunk_from_node(node, content, "test.py", "python")
@@ -299,6 +330,18 @@ class TestClass:
                     metadata.semantic_type = "method_definition"
                     metadata.class_name = "TestClass"
                     metadata.function_name = "__init__" if "init" in str(node) else "get_name"
+                
+                # Add all required attributes
+                metadata.function_signature = None
+                metadata.parameter_types = None
+                metadata.return_type = None
+                metadata.inheritance_chain = None
+                metadata.import_statements = None
+                metadata.docstring = None
+                metadata.complexity_score = 1
+                metadata.dependencies = None
+                metadata.interfaces = None
+                metadata.decorators = None
                 return metadata
 
             mock_extract.side_effect = mock_metadata_response

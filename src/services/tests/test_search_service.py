@@ -160,6 +160,9 @@ class TestSearchService:
     @pytest.mark.asyncio
     async def test_search_by_keywords(self, search_service, mock_config):
         """Test keyword-based search fallback."""
+        # Ensure database is properly initialized
+        search_service._init_vector_db()
+        
         # Store test data in database
         conn = sqlite3.connect(str(search_service.db_path))
         conn.execute(
