@@ -31,7 +31,6 @@ class SearchService:
         if not self.config.EMBEDDING_ENABLED:
             logger.info("Embedding generation disabled by configuration")
             return
-            
         if SentenceTransformer is None:
             logger.warning(
                 "sentence-transformers not available, semantic search disabled"

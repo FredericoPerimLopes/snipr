@@ -352,28 +352,25 @@ class ModifiedCalculator:
     async def test_embedding_integration_during_indexing(self, indexing_service, temp_codebase, mock_config):
         """Test that embeddings are generated during indexing process."""
         from unittest.mock import AsyncMock, patch
+
         from ...models.indexing_models import IndexingRequest
-        
         # Ensure clean state
         metadata_path = indexing_service.config.INDEX_CACHE_DIR / "index_metadata.json"
         if metadata_path.exists():
             metadata_path.unlink()
-        
         # Mock SearchService embedding generation
         with patch('src.services.search_service.SearchService') as mock_search_service_class:
             mock_search_service = AsyncMock()
             mock_search_service.embed_code_chunks = AsyncMock(return_value=[])
             mock_search_service.remove_file_embeddings = AsyncMock()
             mock_search_service_class.return_value = mock_search_service
-            
             request = IndexingRequest(
                 codebase_path=str(temp_codebase),
                 languages=None,
                 exclude_patterns=None
             )
-            
+
             result = await indexing_service.index_codebase(request)
-            
             # Verify embedding generation was called
             assert result.status == "success"
             mock_search_service.embed_code_chunks.assert_called_once()
@@ -381,32 +378,28 @@ class ModifiedCalculator:
             call_args = mock_search_service.embed_code_chunks.call_args[0][0]
             assert len(call_args) > 0  # Should have chunks to embed
 
-    @pytest.mark.asyncio  
+    @pytest.mark.asyncio
     async def test_embedding_configuration_disabled(self, temp_codebase, mock_config):
         """Test that embedding generation can be disabled via configuration."""
         from unittest.mock import patch
+
         from ...models.indexing_models import IndexingRequest
-        
         # Mock config with embeddings disabled
         mock_config.EMBEDDING_ENABLED = False
-        
         with patch("src.services.indexing_service.get_settings") as mock_settings:
             mock_settings.return_value = mock_config
             service = IndexingService()
-            
             # Ensure clean state
             metadata_path = service.config.INDEX_CACHE_DIR / "index_metadata.json"
             if metadata_path.exists():
                 metadata_path.unlink()
-            
             request = IndexingRequest(
                 codebase_path=str(temp_codebase),
                 languages=None,
                 exclude_patterns=None
             )
-            
+
             result = await service.index_codebase(request)
-            
             # Should still work but without embeddings
             assert result.status == "success"
             assert result.indexed_files >= 2

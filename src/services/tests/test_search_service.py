@@ -101,7 +101,7 @@ class TestSearchService:
         search_service.model = mock_embedding_model
 
         # Mock the store method to avoid database operations
-        with patch.object(search_service, '_store_embeddings_batch', new=AsyncMock()) as mock_store:
+        with patch.object(search_service, '_store_embeddings_batch', new=AsyncMock()):
             embedded_chunks = await search_service.embed_code_chunks(sample_code_chunks)
 
             assert len(embedded_chunks) == 2
