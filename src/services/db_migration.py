@@ -19,17 +19,17 @@ class DatabaseMigration:
 
         try:
             conn = sqlite3.connect(str(self.db_path))
-            
+
             # Check if metadata columns already exist
             cursor = conn.execute("PRAGMA table_info(embeddings)")
             columns = [row[1] for row in cursor.fetchall()]
-            
+
             metadata_columns = [
                 'function_signature', 'class_name', 'function_name', 'parameter_types',
                 'return_type', 'inheritance_chain', 'import_statements', 'docstring',
                 'complexity_score', 'dependencies', 'interfaces', 'decorators'
             ]
-            
+
             # Add missing columns
             for column in metadata_columns:
                 if column not in columns:
@@ -44,10 +44,10 @@ class DatabaseMigration:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_class_name ON embeddings(class_name)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_complexity ON embeddings(complexity_score)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_return_type ON embeddings(return_type)")
-            
+
             conn.commit()
             conn.close()
-            
+
             logger.info("Database migration completed successfully")
             return True
 
