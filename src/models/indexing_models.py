@@ -22,6 +22,20 @@ class CodeChunk(BaseModel):
     language: str
     semantic_type: str  # function, class, variable, etc.
     embedding: list[float] | None = None
+    
+    # Rich metadata fields
+    function_signature: str | None = None
+    class_name: str | None = None
+    function_name: str | None = None
+    parameter_types: list[str] | None = None
+    return_type: str | None = None
+    inheritance_chain: list[str] | None = None
+    import_statements: list[str] | None = None
+    docstring: str | None = None
+    complexity_score: int | None = None
+    dependencies: list[str] | None = None
+    interfaces: list[str] | None = None
+    decorators: list[str] | None = None
 
 
 class SearchResponse(BaseModel):

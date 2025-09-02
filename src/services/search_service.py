@@ -14,6 +14,8 @@ except ImportError:
 
 from ..config import get_settings
 from ..models.indexing_models import CodeChunk, SearchRequest, SearchResponse
+from .bm25_search import BM25SearchEngine
+from .db_migration import DatabaseMigration
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +25,7 @@ class SearchService:
         self.config = get_settings()
         self.model: SentenceTransformer | None = None
         self.db_path = self.config.VECTOR_DB_PATH
+        self.bm25_engine = BM25SearchEngine()
         self._init_embedding_model()
         self._init_vector_db()
 
@@ -47,11 +50,16 @@ class SearchService:
         try:
             # Create cache directory if it doesn't exist
             self.config.INDEX_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+            
+            # Run database migration first
+            migration = DatabaseMigration()
+            import asyncio
+            asyncio.create_task(migration.migrate_to_metadata_schema())
 
             # Initialize SQLite database with vector extension
             conn = sqlite3.connect(str(self.db_path))
 
-            # Create embeddings table
+            # Create embeddings table with metadata fields
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS embeddings (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -64,6 +72,18 @@ class SearchService:
                     embedding BLOB,
                     content_hash TEXT NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    function_signature TEXT,
+                    class_name TEXT,
+                    function_name TEXT,
+                    parameter_types TEXT,
+                    return_type TEXT,
+                    inheritance_chain TEXT,
+                    import_statements TEXT,
+                    docstring TEXT,
+                    complexity_score INTEGER,
+                    dependencies TEXT,
+                    interfaces TEXT,
+                    decorators TEXT,
                     UNIQUE(file_path, start_line, end_line)
                 )
             """)
@@ -73,6 +93,12 @@ class SearchService:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_semantic_type ON embeddings(semantic_type)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_file_path ON embeddings(file_path)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_content_hash ON embeddings(content_hash)")
+            
+            # Create metadata indexes
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_function_name ON embeddings(function_name)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_class_name ON embeddings(class_name)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_complexity ON embeddings(complexity_score)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_return_type ON embeddings(return_type)")
 
             conn.commit()
             conn.close()
@@ -116,6 +142,9 @@ class SearchService:
                 # Store in database
                 await self._store_embeddings_batch(batch_chunks)
 
+            # Build BM25 index for all chunks
+            await self.bm25_engine.build_index(embedded_chunks)
+
             processing_time = (time.time() - start_time) * 1000
             logger.info(f"Generated embeddings for {len(chunks)} chunks in {processing_time:.1f}ms")
 
@@ -148,13 +177,24 @@ class SearchService:
                 # Calculate content hash for deduplication
                 content_hash = hash(chunk.content)
 
-                # Insert or replace embedding
+                # Serialize metadata fields
+                parameter_types_json = json.dumps(chunk.parameter_types) if chunk.parameter_types else None
+                inheritance_chain_json = json.dumps(chunk.inheritance_chain) if chunk.inheritance_chain else None
+                import_statements_json = json.dumps(chunk.import_statements) if chunk.import_statements else None
+                dependencies_json = json.dumps(chunk.dependencies) if chunk.dependencies else None
+                interfaces_json = json.dumps(chunk.interfaces) if chunk.interfaces else None
+                decorators_json = json.dumps(chunk.decorators) if chunk.decorators else None
+
+                # Insert or replace embedding with metadata
                 conn.execute(
                     """
                     INSERT OR REPLACE INTO embeddings
                     (file_path, content, start_line, end_line, language,
-                     semantic_type, embedding, content_hash)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                     semantic_type, embedding, content_hash, function_signature,
+                     class_name, function_name, parameter_types, return_type,
+                     inheritance_chain, import_statements, docstring, complexity_score,
+                     dependencies, interfaces, decorators)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                     (
                         chunk.file_path,
@@ -165,6 +205,18 @@ class SearchService:
                         chunk.semantic_type,
                         embedding_blob,
                         str(content_hash),
+                        chunk.function_signature,
+                        chunk.class_name,
+                        chunk.function_name,
+                        parameter_types_json,
+                        chunk.return_type,
+                        inheritance_chain_json,
+                        import_statements_json,
+                        chunk.docstring,
+                        chunk.complexity_score,
+                        dependencies_json,
+                        interfaces_json,
+                        decorators_json,
                     ),
                 )
 
@@ -212,7 +264,10 @@ class SearchService:
 
             # Build query with optional language filter
             base_query = """
-                SELECT file_path, content, start_line, end_line, language, semantic_type, embedding
+                SELECT file_path, content, start_line, end_line, language, semantic_type, embedding,
+                       function_signature, class_name, function_name, parameter_types, return_type,
+                       inheritance_chain, import_statements, docstring, complexity_score,
+                       dependencies, interfaces, decorators
                 FROM embeddings
             """
 
@@ -237,6 +292,14 @@ class SearchService:
                     similarity = self._cosine_similarity(query_embedding, stored_embedding)
 
                     if similarity >= threshold:
+                        # Deserialize metadata fields
+                        parameter_types = json.loads(row[10]) if row[10] else None
+                        inheritance_chain = json.loads(row[12]) if row[12] else None
+                        import_statements = json.loads(row[13]) if row[13] else None
+                        dependencies = json.loads(row[16]) if row[16] else None
+                        interfaces = json.loads(row[17]) if row[17] else None
+                        decorators = json.loads(row[18]) if row[18] else None
+
                         chunk = CodeChunk(
                             file_path=row[0],
                             content=row[1],
@@ -245,6 +308,18 @@ class SearchService:
                             language=row[4],
                             semantic_type=row[5],
                             embedding=stored_embedding.tolist(),
+                            function_signature=row[7],
+                            class_name=row[8],
+                            function_name=row[9],
+                            parameter_types=parameter_types,
+                            return_type=row[11],
+                            inheritance_chain=inheritance_chain,
+                            import_statements=import_statements,
+                            docstring=row[14],
+                            complexity_score=row[15],
+                            dependencies=dependencies,
+                            interfaces=interfaces,
+                            decorators=decorators,
                         )
                         similarities.append((similarity, chunk))
 
@@ -277,6 +352,76 @@ class SearchService:
         except Exception as e:
             logger.debug(f"Error calculating similarity: {e}")
             return 0.0
+
+    async def search_by_bm25(self, query: str, language_filter: str | None = None, max_results: int = 50) -> list[CodeChunk]:
+        """BM25-based lexical search."""
+        try:
+            # Get BM25 results (document IDs with scores)
+            bm25_results = await self.bm25_engine.search(query, language_filter, max_results)
+            
+            if not bm25_results:
+                return []
+
+            # Convert document IDs back to CodeChunks
+            chunks = []
+            conn = sqlite3.connect(str(self.db_path))
+            
+            for doc_id, score in bm25_results:
+                # Parse document ID to get file_path and start_line
+                file_path, start_line_str = doc_id.rsplit(':', 1)
+                start_line = int(start_line_str)
+                
+                # Query database for full chunk data
+                cursor = conn.execute(
+                    """
+                    SELECT file_path, content, start_line, end_line, language, semantic_type,
+                           function_signature, class_name, function_name, parameter_types, return_type,
+                           inheritance_chain, import_statements, docstring, complexity_score,
+                           dependencies, interfaces, decorators
+                    FROM embeddings 
+                    WHERE file_path = ? AND start_line = ?
+                    """,
+                    (file_path, start_line)
+                )
+                
+                row = cursor.fetchone()
+                if row:
+                    # Deserialize metadata fields
+                    parameter_types = json.loads(row[9]) if row[9] else None
+                    inheritance_chain = json.loads(row[11]) if row[11] else None
+                    import_statements = json.loads(row[12]) if row[12] else None
+                    dependencies = json.loads(row[15]) if row[15] else None
+                    interfaces = json.loads(row[16]) if row[16] else None
+                    decorators = json.loads(row[17]) if row[17] else None
+
+                    chunk = CodeChunk(
+                        file_path=row[0],
+                        content=row[1],
+                        start_line=row[2],
+                        end_line=row[3],
+                        language=row[4],
+                        semantic_type=row[5],
+                        function_signature=row[6],
+                        class_name=row[7],
+                        function_name=row[8],
+                        parameter_types=parameter_types,
+                        return_type=row[10],
+                        inheritance_chain=inheritance_chain,
+                        import_statements=import_statements,
+                        docstring=row[13],
+                        complexity_score=row[14],
+                        dependencies=dependencies,
+                        interfaces=interfaces,
+                        decorators=decorators,
+                    )
+                    chunks.append(chunk)
+            
+            conn.close()
+            return chunks
+
+        except Exception as e:
+            logger.error(f"Error in BM25 search: {e}")
+            return []
 
     async def search_by_keywords(self, query: str, language_filter: str | None = None) -> list[CodeChunk]:
         """Simple keyword-based search as fallback."""
