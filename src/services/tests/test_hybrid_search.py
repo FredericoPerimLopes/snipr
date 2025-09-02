@@ -1,8 +1,9 @@
-import pytest
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, Mock
 
-from ..hybrid_search import HybridSearchService, HybridSearchConfig
+import pytest
+
 from ...models.indexing_models import CodeChunk, SearchRequest, SearchResponse
+from ..hybrid_search import HybridSearchConfig, HybridSearchService
 
 
 class TestHybridSearchService:
@@ -40,7 +41,7 @@ class TestHybridSearchService:
                 content="class UserManager:\n    def get_user(self, id: int):",
                 start_line=5,
                 end_line=7,
-                language="python", 
+                language="python",
                 semantic_type="class_definition",
                 class_name="UserManager"
             )
@@ -52,10 +53,10 @@ class TestHybridSearchService:
         # Create different result lists (simulating different search methods)
         bm25_results = [sample_chunks[0], sample_chunks[1]]  # BM25 order
         semantic_results = [sample_chunks[1], sample_chunks[0]]  # Semantic order (reversed)
-        
+
         # Apply RRF
         fused_results = hybrid_service._reciprocal_rank_fusion([bm25_results, semantic_results], k=60)
-        
+
         assert len(fused_results) == 2
         # Both chunks should be present
         chunk_paths = [chunk.file_path for chunk in fused_results]
@@ -63,11 +64,13 @@ class TestHybridSearchService:
         assert "user.py" in chunk_paths
 
     @pytest.mark.asyncio
-    async def test_hybrid_search_integration(self, hybrid_service, mock_search_service, mock_metadata_service, sample_chunks):
+    async def test_hybrid_search_integration(
+        self, hybrid_service, mock_search_service, mock_metadata_service, sample_chunks
+    ):
         """Test full hybrid search integration."""
         # Setup mock responses
         mock_search_service.search_by_bm25.return_value = [sample_chunks[0]]
-        
+
         semantic_response = SearchResponse(
             results=[sample_chunks[1]],
             total_matches=1,
@@ -75,16 +78,16 @@ class TestHybridSearchService:
         )
         mock_search_service.search_code.return_value = semantic_response
         mock_metadata_service.search.return_value = [sample_chunks[0]]
-        
+
         # Create search request
         request = SearchRequest(
             query="user authentication",
             max_results=10
         )
-        
+
         # Execute hybrid search
         response = await hybrid_service.search(request)
-        
+
         assert response.total_matches > 0
         assert len(response.results) > 0
         assert response.query_time_ms > 0
@@ -109,21 +112,33 @@ class TestHybridSearchService:
         """Test diversity filtering."""
         # Create chunks from same file
         same_file_chunks = [
-            CodeChunk(file_path="same.py", content="func1", start_line=1, end_line=2, language="python", semantic_type="function"),
-            CodeChunk(file_path="same.py", content="func2", start_line=3, end_line=4, language="python", semantic_type="function"),
-            CodeChunk(file_path="same.py", content="func3", start_line=5, end_line=6, language="python", semantic_type="function"),
-            CodeChunk(file_path="same.py", content="func4", start_line=7, end_line=8, language="python", semantic_type="function"),
+            CodeChunk(
+                file_path="same.py", content="func1", start_line=1, end_line=2,
+                language="python", semantic_type="function"
+            ),
+            CodeChunk(
+                file_path="same.py", content="func2", start_line=3, end_line=4,
+                language="python", semantic_type="function"
+            ),
+            CodeChunk(
+                file_path="same.py", content="func3", start_line=5, end_line=6,
+                language="python", semantic_type="function"
+            ),
+            CodeChunk(
+                file_path="same.py", content="func4", start_line=7, end_line=8,
+                language="python", semantic_type="function"
+            ),
         ]
-        
+
         diverse_results = hybrid_service._apply_diversity_filter(same_file_chunks, max_per_file=2)
-        
+
         assert len(diverse_results) == 2  # Limited to 2 per file
 
     @pytest.mark.asyncio
     async def test_query_expansion(self, hybrid_service):
         """Test query expansion functionality."""
         expanded = await hybrid_service.expand_query("authentication")
-        
+
         assert len(expanded) > 1
         assert "authentication" in expanded
         # Should contain expanded terms
@@ -137,10 +152,10 @@ class TestHybridSearchService:
         mock_search_service.search_by_bm25.side_effect = Exception("BM25 failed")
         mock_search_service.search_code.return_value = SearchResponse(results=[], total_matches=0, query_time_ms=0)
         mock_metadata_service.search.return_value = []
-        
+
         request = SearchRequest(query="test", max_results=10)
         response = await hybrid_service.search(request)
-        
+
         # Should handle failure gracefully
         assert response.total_matches == 0
         assert response.query_time_ms >= 0
@@ -148,19 +163,19 @@ class TestHybridSearchService:
     def test_hybrid_search_config(self):
         """Test hybrid search configuration."""
         config = HybridSearchConfig()
-        
+
         assert config.bm25_weight == 0.4
-        assert config.semantic_weight == 0.4  
+        assert config.semantic_weight == 0.4
         assert config.metadata_weight == 0.2
         assert config.rrf_k_parameter == 60
         assert config.enable_query_expansion is True
-        
+
         # Test custom configuration
         custom_config = HybridSearchConfig(
             bm25_weight=0.5,
             semantic_weight=0.3,
             metadata_weight=0.2
         )
-        
+
         assert custom_config.bm25_weight == 0.5
         assert custom_config.semantic_weight == 0.3
