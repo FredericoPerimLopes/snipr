@@ -330,7 +330,7 @@ class TestClass:
                     metadata.semantic_type = "method_definition"
                     metadata.class_name = "TestClass"
                     metadata.function_name = "__init__" if "init" in str(node) else "get_name"
-                
+
                 # Add all required attributes
                 metadata.function_signature = None
                 metadata.parameter_types = None
