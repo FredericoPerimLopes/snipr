@@ -353,7 +353,9 @@ class SearchService:
             logger.debug(f"Error calculating similarity: {e}")
             return 0.0
 
-    async def search_by_bm25(self, query: str, language_filter: str | None = None, max_results: int = 50) -> list[CodeChunk]:
+    async def search_by_bm25(
+        self, query: str, language_filter: str | None = None, max_results: int = 50
+    ) -> list[CodeChunk]:
         """BM25-based lexical search."""
         try:
             # Get BM25 results (document IDs with scores)

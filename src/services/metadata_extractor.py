@@ -240,7 +240,7 @@ class MetadataExtractor:
                             for expr_child in stmt_child.children:
                                 if expr_child.type == "string":
                                     docstring = content[expr_child.start_byte:expr_child.end_byte]
-                                    return docstring.strip('"""').strip("'''").strip()
+                                    return docstring.strip().strip('"""').strip("'''")
             return None
         except Exception:
             return None
@@ -541,7 +541,7 @@ class MetadataExtractor:
         except Exception:
             return None
 
-    async def extract_file_level_metadata(self, file_path: str, content: str) -> Dict[str, Any]:
+    async def extract_file_level_metadata(self, file_path: str, content: str) -> dict[str, any]:
         """Extract file-level metadata including all imports and dependencies."""
         try:
             language = self._detect_language_from_path(file_path)

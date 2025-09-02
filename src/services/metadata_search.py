@@ -79,7 +79,9 @@ class MetadataSearchEngine:
                 params.append(language)
 
             # Only search function-like semantic types
-            where_clauses.append("semantic_type IN ('function_definition', 'async_function_definition', 'method_definition')")
+            where_clauses.append(
+                "semantic_type IN ('function_definition', 'async_function_definition', 'method_definition')"
+            )
 
             query = f"""
                 SELECT file_path, content, start_line, end_line, language, semantic_type,
@@ -361,7 +363,9 @@ class MetadataSearchEngine:
             logger.debug(f"Error converting row to chunk: {e}")
             return None
 
-    async def search_by_complexity(self, min_complexity: int = None, max_complexity: int = None, language: str = None) -> list[CodeChunk]:
+    async def search_by_complexity(
+        self, min_complexity: int = None, max_complexity: int = None, language: str = None
+    ) -> list[CodeChunk]:
         """Search functions by complexity score."""
         try:
             conn = sqlite3.connect(str(self.db_path))
@@ -416,7 +420,9 @@ class MetadataSearchEngine:
 
             conn = sqlite3.connect(str(self.db_path))
 
-            where_clauses = ["semantic_type IN ('function_definition', 'async_function_definition', 'method_definition')"]
+            where_clauses = [
+                "semantic_type IN ('function_definition', 'async_function_definition', 'method_definition')"
+            ]
             params = []
 
             # Search for functions with similar signature components
