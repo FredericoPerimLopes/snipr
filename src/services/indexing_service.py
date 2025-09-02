@@ -50,6 +50,8 @@ from ..models.indexing_models import (
     IndexingResponse,
     IndexingStatus,
 )
+from .metadata_extractor import MetadataExtractor
+from .syntactic_chunker import SyntacticChunker
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +62,8 @@ class IndexingService:
         self.parsers: dict[str, Parser] = {}
         self.languages: dict[str, Language] = {}
         self.code_splitters: dict[str, CodeSplitter] = {}
+        self.metadata_extractor = MetadataExtractor()
+        self.syntactic_chunker = SyntacticChunker()
         self._init_parsers()
         self._init_code_splitters()
 
@@ -266,16 +270,43 @@ class IndexingService:
             # Read file content
             content = file_path.read_text(encoding="utf-8", errors="ignore")
 
-            # Use hybrid approach: LlamaIndex chunking + Tree-sitter semantic typing
-            if language in self.code_splitters and CodeSplitter is not None:
-                return await self._hybrid_chunking(file_path, content, language)
+            # Use syntactic chunking for better code integrity
+            if language in self.parsers:
+                parser = self.parsers[language]
+                return await self.syntactic_chunker.chunk_with_integrity(str(file_path), content, language, parser)
             else:
-                # Fallback to Tree-sitter only approach
-                return await self._tree_sitter_chunking(file_path, content, language)
+                # Fallback for unsupported languages
+                return await self._basic_chunking(file_path, content, language)
 
         except Exception as e:
             logger.error(f"Error parsing {file_path}: {e}")
             return []
+
+    async def _basic_chunking(self, file_path: Path, content: str, language: str) -> list[CodeChunk]:
+        """Basic line-based chunking for unsupported languages."""
+        lines = content.split("\n")
+        chunks = []
+
+        chunk_size = 15  # lines per chunk
+        overlap = 3  # overlapping lines
+
+        for i in range(0, len(lines), chunk_size - overlap):
+            end_idx = min(i + chunk_size, len(lines))
+            chunk_lines = lines[i:end_idx]
+            chunk_content = "\n".join(chunk_lines)
+
+            if chunk_content.strip():  # Skip empty chunks
+                chunk = CodeChunk(
+                    file_path=str(file_path),
+                    content=chunk_content,
+                    start_line=i + 1,
+                    end_line=end_idx,
+                    language=language,
+                    semantic_type="code_block",
+                )
+                chunks.append(chunk)
+
+        return chunks
 
     async def _hybrid_chunking(self, file_path: Path, content: str, language: str) -> list[CodeChunk]:
         """Hybrid chunking using LlamaIndex + Tree-sitter for optimal context preservation."""
@@ -380,6 +411,9 @@ class IndexingService:
 
             # If no semantic chunks found, create a general code chunk
             if not chunks:
+                # Extract file-level metadata for fallback chunk
+                file_metadata = await self.metadata_extractor.extract_file_level_metadata(file_path, text)
+
                 chunk = CodeChunk(
                     file_path=file_path,
                     content=text,
@@ -388,6 +422,8 @@ class IndexingService:
                     language=language,
                     semantic_type="code_block",
                     embedding=None,
+                    import_statements=file_metadata.get("imports"),
+                    dependencies=file_metadata.get("dependencies"),
                 )
                 chunks.append(chunk)
 
@@ -395,18 +431,34 @@ class IndexingService:
 
         except Exception as e:
             logger.debug(f"Error extracting semantic chunks: {e}")
-            # Fallback: create single chunk
-            return [
-                CodeChunk(
-                    file_path=file_path,
-                    content=text,
-                    start_line=1,
-                    end_line=len(text.split("\n")),
-                    language=language,
-                    semantic_type="code_block",
-                    embedding=None,
-                )
-            ]
+            # Fallback: create single chunk with basic metadata
+            try:
+                file_metadata = await self.metadata_extractor.extract_file_level_metadata(file_path, text)
+                return [
+                    CodeChunk(
+                        file_path=file_path,
+                        content=text,
+                        start_line=1,
+                        end_line=len(text.split("\n")),
+                        language=language,
+                        semantic_type="code_block",
+                        embedding=None,
+                        import_statements=file_metadata.get("imports"),
+                        dependencies=file_metadata.get("dependencies"),
+                    )
+                ]
+            except Exception:
+                return [
+                    CodeChunk(
+                        file_path=file_path,
+                        content=text,
+                        start_line=1,
+                        end_line=len(text.split("\n")),
+                        language=language,
+                        semantic_type="code_block",
+                        embedding=None,
+                    )
+                ]
 
     def _detect_language(self, file_path: Path) -> str:
         """Detect programming language from file extension."""
@@ -475,15 +527,30 @@ class IndexingService:
 
             chunk_content = "\n".join(lines[context_start:context_end])
 
-            # Create code chunk
+            # Extract rich metadata
+            metadata = await self.metadata_extractor.extract_all_metadata(node, content, language)
+
+            # Create enhanced code chunk
             chunk = CodeChunk(
                 file_path=file_path,
                 content=chunk_content,
                 start_line=context_start + 1,  # Convert to 1-based line numbers
                 end_line=context_end,
                 language=language,
-                semantic_type=node.type,
+                semantic_type=metadata.semantic_type,
                 embedding=None,  # Will be populated by SearchService
+                function_signature=metadata.function_signature,
+                class_name=metadata.class_name,
+                function_name=metadata.function_name,
+                parameter_types=metadata.parameter_types,
+                return_type=metadata.return_type,
+                inheritance_chain=metadata.inheritance_chain,
+                import_statements=metadata.import_statements,
+                docstring=metadata.docstring,
+                complexity_score=metadata.complexity_score,
+                dependencies=metadata.dependencies,
+                interfaces=metadata.interfaces,
+                decorators=metadata.decorators,
             )
 
             chunks.append(chunk)

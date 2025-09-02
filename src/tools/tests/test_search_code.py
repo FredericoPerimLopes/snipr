@@ -23,6 +23,14 @@ def mock_search_service():
 
 
 @pytest.fixture
+def mock_hybrid_search_service():
+    """Mock HybridSearchService for testing."""
+    with patch("src.tools.search_code.hybrid_search_service") as mock:
+        mock.search = AsyncMock()
+        yield mock
+
+
+@pytest.fixture
 def sample_search_response():
     """Create sample search response for testing."""
     return SearchResponse(
@@ -53,10 +61,10 @@ def sample_search_response():
 
 class TestSearchCodeTool:
     @pytest.mark.asyncio
-    async def test_search_code_success(self, mock_search_service, sample_search_response):
+    async def test_search_code_success(self, mock_hybrid_search_service, sample_search_response):
         """Test successful code search."""
         # Setup mock
-        mock_search_service.search_code.return_value = sample_search_response
+        mock_hybrid_search_service.search.return_value = sample_search_response
 
         # Execute tool
         result_json = await search_code("hello world function", "python", 10, 0.7)
@@ -99,10 +107,10 @@ class TestSearchCodeTool:
         assert result["filters"]["similarity_threshold"] == 0.0  # Clamped to min
 
     @pytest.mark.asyncio
-    async def test_search_code_error_handling(self, mock_search_service):
+    async def test_search_code_error_handling(self, mock_hybrid_search_service):
         """Test error handling in search tool."""
         # Setup mock to raise exception
-        mock_search_service.search_code.side_effect = ValueError("Search failed")
+        mock_hybrid_search_service.search.side_effect = ValueError("Search failed")
 
         # Execute tool
         result_json = await search_code("test query")
@@ -221,9 +229,10 @@ class TestSearchCodeTool:
             assert isinstance(result_json, str)
 
     @pytest.mark.asyncio
-    async def test_search_tools_error_handling(self, mock_search_service):
+    async def test_search_tools_error_handling(self, mock_search_service, mock_hybrid_search_service):
         """Test error handling across all search tools."""
         # Setup mocks to raise exceptions
+        mock_hybrid_search_service.search.side_effect = Exception("Search service error")
         mock_search_service.search_code.side_effect = Exception("Search service error")
         mock_search_service.search_by_keywords.side_effect = Exception("Keyword search error")
         mock_search_service.get_embeddings_stats.side_effect = Exception("Stats error")
