@@ -25,7 +25,7 @@ class MetadataSearchEngine:
                 return_type=parsed_query.get("return_type"),
                 parameter_types=parsed_query.get("parameter_types"),
                 language=language,
-                max_results=max_results
+                max_results=max_results,
             )
         elif parsed_query["type"] == "class":
             return await self.search_classes(
@@ -33,14 +33,14 @@ class MetadataSearchEngine:
                 inherits_from=parsed_query.get("inherits_from"),
                 implements=parsed_query.get("implements"),
                 language=language,
-                max_results=max_results
+                max_results=max_results,
             )
         elif parsed_query["type"] == "import":
             return await self.search_by_imports(
                 import_module=parsed_query.get("import_module"),
                 uses_function=parsed_query.get("uses_function"),
                 language=language,
-                max_results=max_results
+                max_results=max_results,
             )
         else:
             return await self.search_general_metadata(query, language, max_results)
@@ -51,7 +51,7 @@ class MetadataSearchEngine:
         return_type: str = None,
         parameter_types: list[str] = None,
         language: str = None,
-        max_results: int = 50
+        max_results: int = 50,
     ) -> list[CodeChunk]:
         """Search for functions by metadata."""
         try:
@@ -89,7 +89,7 @@ class MetadataSearchEngine:
                        inheritance_chain, import_statements, docstring, complexity_score,
                        dependencies, interfaces, decorators
                 FROM embeddings
-                WHERE {' AND '.join(where_clauses)}
+                WHERE {" AND ".join(where_clauses)}
                 ORDER BY complexity_score ASC
                 LIMIT ?
             """
@@ -119,7 +119,7 @@ class MetadataSearchEngine:
         inherits_from: str = None,
         implements: list[str] = None,
         language: str = None,
-        max_results: int = 50
+        max_results: int = 50,
     ) -> list[CodeChunk]:
         """Search for classes by metadata."""
         try:
@@ -154,7 +154,7 @@ class MetadataSearchEngine:
                        inheritance_chain, import_statements, docstring, complexity_score,
                        dependencies, interfaces, decorators
                 FROM embeddings
-                WHERE {' AND '.join(where_clauses)}
+                WHERE {" AND ".join(where_clauses)}
                 LIMIT ?
             """
 
@@ -178,11 +178,7 @@ class MetadataSearchEngine:
             return []
 
     async def search_by_imports(
-        self,
-        import_module: str = None,
-        uses_function: str = None,
-        language: str = None,
-        max_results: int = 50
+        self, import_module: str = None, uses_function: str = None, language: str = None, max_results: int = 50
     ) -> list[CodeChunk]:
         """Search code by import dependencies."""
         try:
@@ -209,7 +205,7 @@ class MetadataSearchEngine:
                        inheritance_chain, import_statements, docstring, complexity_score,
                        dependencies, interfaces, decorators
                 FROM embeddings
-                WHERE {' AND '.join(where_clauses) if where_clauses else '1=1'}
+                WHERE {" AND ".join(where_clauses) if where_clauses else "1=1"}
                 LIMIT ?
             """
 
@@ -294,35 +290,35 @@ class MetadataSearchEngine:
         parsed = {"type": "general"}
 
         # Function queries
-        if re.search(r'function.*return.*(\w+)', query_lower):
+        if re.search(r"function.*return.*(\w+)", query_lower):
             parsed["type"] = "function"
-            return_match = re.search(r'return.*?(\w+)', query_lower)
+            return_match = re.search(r"return.*?(\w+)", query_lower)
             if return_match:
                 parsed["return_type"] = return_match.group(1)
 
-        elif re.search(r'function.*(\w+)', query_lower):
+        elif re.search(r"function.*(\w+)", query_lower):
             parsed["type"] = "function"
-            func_match = re.search(r'function.*?(\w+)', query_lower)
+            func_match = re.search(r"function.*?(\w+)", query_lower)
             if func_match:
                 parsed["function_name"] = func_match.group(1)
 
         # Class queries
-        elif re.search(r'class.*inherit.*(\w+)', query_lower):
+        elif re.search(r"class.*inherit.*(\w+)", query_lower):
             parsed["type"] = "class"
-            inherit_match = re.search(r'inherit.*?(\w+)', query_lower)
+            inherit_match = re.search(r"inherit.*?(\w+)", query_lower)
             if inherit_match:
                 parsed["inherits_from"] = inherit_match.group(1)
 
-        elif re.search(r'class.*(\w+)', query_lower):
+        elif re.search(r"class.*(\w+)", query_lower):
             parsed["type"] = "class"
-            class_match = re.search(r'class.*?(\w+)', query_lower)
+            class_match = re.search(r"class.*?(\w+)", query_lower)
             if class_match:
                 parsed["class_name"] = class_match.group(1)
 
         # Import queries
-        elif re.search(r'import.*(\w+)', query_lower):
+        elif re.search(r"import.*(\w+)", query_lower):
             parsed["type"] = "import"
-            import_match = re.search(r'import.*?(\w+)', query_lower)
+            import_match = re.search(r"import.*?(\w+)", query_lower)
             if import_match:
                 parsed["import_module"] = import_match.group(1)
 
@@ -391,7 +387,7 @@ class MetadataSearchEngine:
                        inheritance_chain, import_statements, docstring, complexity_score,
                        dependencies, interfaces, decorators
                 FROM embeddings
-                WHERE {' AND '.join(where_clauses)}
+                WHERE {" AND ".join(where_clauses)}
                 ORDER BY complexity_score DESC
                 LIMIT 50
             """
@@ -445,7 +441,7 @@ class MetadataSearchEngine:
                        inheritance_chain, import_statements, docstring, complexity_score,
                        dependencies, interfaces, decorators
                 FROM embeddings
-                WHERE {' AND '.join(where_clauses)}
+                WHERE {" AND ".join(where_clauses)}
                 LIMIT 50
             """
 
@@ -468,11 +464,11 @@ class MetadataSearchEngine:
     def _tokenize_signature(self, signature: str) -> list[str]:
         """Extract meaningful tokens from function signature."""
         # Remove common keywords and punctuation
-        cleaned = re.sub(r'[(),\[\]{}<>]', ' ', signature.lower())
+        cleaned = re.sub(r"[(),\[\]{}<>]", " ", signature.lower())
         tokens = cleaned.split()
 
         # Filter out common keywords
-        stop_words = {'def', 'function', 'async', 'public', 'private', 'static', 'void', 'const', 'let', 'var'}
+        stop_words = {"def", "function", "async", "public", "private", "static", "void", "const", "let", "var"}
         meaningful_tokens = [token for token in tokens if token not in stop_words and len(token) > 2]
 
         return meaningful_tokens
@@ -492,7 +488,7 @@ class MetadataSearchEngine:
             query = f"""
                 SELECT class_name, inheritance_chain, interfaces
                 FROM embeddings
-                WHERE {' AND '.join(where_clauses)}
+                WHERE {" AND ".join(where_clauses)}
                 AND semantic_type IN ('class_definition', 'class_declaration')
                 LIMIT 1
             """
@@ -518,7 +514,7 @@ class MetadataSearchEngine:
                 "class_name": class_name,
                 "parents": inheritance_chain,
                 "interfaces": interfaces,
-                "parent_trees": parent_info
+                "parent_trees": parent_info,
             }
 
         except Exception as e:
@@ -537,7 +533,7 @@ class MetadataSearchEngine:
                 FROM embeddings
                 WHERE file_path = ?
                 """,
-                (file_path,)
+                (file_path,),
             )
 
             rows = cursor.fetchall()
@@ -569,7 +565,7 @@ class MetadataSearchEngine:
                 "imports": list(all_imports),
                 "dependencies": list(all_dependencies),
                 "functions": list(functions),
-                "classes": list(classes)
+                "classes": list(classes),
             }
 
         except Exception as e:

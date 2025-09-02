@@ -34,7 +34,7 @@ class TestHybridSearchService:
                 end_line=2,
                 language="python",
                 semantic_type="function_definition",
-                function_name="authenticate_user"
+                function_name="authenticate_user",
             ),
             CodeChunk(
                 file_path="user.py",
@@ -43,8 +43,8 @@ class TestHybridSearchService:
                 end_line=7,
                 language="python",
                 semantic_type="class_definition",
-                class_name="UserManager"
-            )
+                class_name="UserManager",
+            ),
         ]
 
     @pytest.mark.asyncio
@@ -71,19 +71,12 @@ class TestHybridSearchService:
         # Setup mock responses
         mock_search_service.search_by_bm25.return_value = [sample_chunks[0]]
 
-        semantic_response = SearchResponse(
-            results=[sample_chunks[1]],
-            total_matches=1,
-            query_time_ms=10.0
-        )
+        semantic_response = SearchResponse(results=[sample_chunks[1]], total_matches=1, query_time_ms=10.0)
         mock_search_service.search_code.return_value = semantic_response
         mock_metadata_service.search.return_value = [sample_chunks[0]]
 
         # Create search request
-        request = SearchRequest(
-            query="user authentication",
-            max_results=10
-        )
+        request = SearchRequest(query="user authentication", max_results=10)
 
         # Execute hybrid search
         response = await hybrid_service.search(request)
@@ -113,20 +106,36 @@ class TestHybridSearchService:
         # Create chunks from same file
         same_file_chunks = [
             CodeChunk(
-                file_path="same.py", content="func1", start_line=1, end_line=2,
-                language="python", semantic_type="function"
+                file_path="same.py",
+                content="func1",
+                start_line=1,
+                end_line=2,
+                language="python",
+                semantic_type="function",
             ),
             CodeChunk(
-                file_path="same.py", content="func2", start_line=3, end_line=4,
-                language="python", semantic_type="function"
+                file_path="same.py",
+                content="func2",
+                start_line=3,
+                end_line=4,
+                language="python",
+                semantic_type="function",
             ),
             CodeChunk(
-                file_path="same.py", content="func3", start_line=5, end_line=6,
-                language="python", semantic_type="function"
+                file_path="same.py",
+                content="func3",
+                start_line=5,
+                end_line=6,
+                language="python",
+                semantic_type="function",
             ),
             CodeChunk(
-                file_path="same.py", content="func4", start_line=7, end_line=8,
-                language="python", semantic_type="function"
+                file_path="same.py",
+                content="func4",
+                start_line=7,
+                end_line=8,
+                language="python",
+                semantic_type="function",
             ),
         ]
 
@@ -171,11 +180,7 @@ class TestHybridSearchService:
         assert config.enable_query_expansion is True
 
         # Test custom configuration
-        custom_config = HybridSearchConfig(
-            bm25_weight=0.5,
-            semantic_weight=0.3,
-            metadata_weight=0.2
-        )
+        custom_config = HybridSearchConfig(bm25_weight=0.5, semantic_weight=0.3, metadata_weight=0.2)
 
         assert custom_config.bm25_weight == 0.5
         assert custom_config.semantic_weight == 0.3

@@ -162,7 +162,7 @@ class MetadataExtractor:
         """Get text content of a specific child node type."""
         for child in node.children:
             if child.type == child_type:
-                return content[child.start_byte:child.end_byte]
+                return content[child.start_byte : child.end_byte]
         return None
 
     def _extract_python_function_signature(self, node: Node, content: str) -> str | None:
@@ -183,7 +183,7 @@ class MetadataExtractor:
             # Return type annotation
             for child in node.children:
                 if child.type == "type":
-                    return_type = content[child.start_byte:child.end_byte]
+                    return_type = content[child.start_byte : child.end_byte]
                     sig_parts.append(f" -> {return_type}")
 
             return "".join(sig_parts) if sig_parts else None
@@ -201,7 +201,7 @@ class MetadataExtractor:
                             # Look for type annotation
                             for annotation_child in param_child.children:
                                 if annotation_child.type == "type":
-                                    type_text = content[annotation_child.start_byte:annotation_child.end_byte]
+                                    type_text = content[annotation_child.start_byte : annotation_child.end_byte]
                                     param_types.append(type_text)
             return param_types if param_types else None
         except Exception:
@@ -212,7 +212,7 @@ class MetadataExtractor:
         try:
             for child in node.children:
                 if child.type == "type":
-                    return content[child.start_byte:child.end_byte]
+                    return content[child.start_byte : child.end_byte]
             return None
         except Exception:
             return None
@@ -223,7 +223,7 @@ class MetadataExtractor:
             decorators = []
             for child in node.children:
                 if child.type == "decorator":
-                    decorator_text = content[child.start_byte:child.end_byte]
+                    decorator_text = content[child.start_byte : child.end_byte]
                     decorators.append(decorator_text)
             return decorators if decorators else None
         except Exception:
@@ -239,8 +239,8 @@ class MetadataExtractor:
                         if stmt_child.type == "expression_statement":
                             for expr_child in stmt_child.children:
                                 if expr_child.type == "string":
-                                    docstring = content[expr_child.start_byte:expr_child.end_byte]
-                                    return docstring.strip().replace('"""', '').replace("'''", '')
+                                    docstring = content[expr_child.start_byte : expr_child.end_byte]
+                                    return docstring.strip().replace('"""', "").replace("'''", "")
             return None
         except Exception:
             return None
@@ -253,7 +253,7 @@ class MetadataExtractor:
                 if child.type == "argument_list":
                     for arg_child in child.children:
                         if arg_child.type == "identifier":
-                            base_class = content[arg_child.start_byte:arg_child.end_byte]
+                            base_class = content[arg_child.start_byte : arg_child.end_byte]
                             inheritance.append(base_class)
             return inheritance if inheritance else None
         except Exception:
@@ -267,7 +267,7 @@ class MetadataExtractor:
 
             # Find the opening brace to get just the signature
             node_text = content[start_byte:end_byte]
-            brace_index = node_text.find('{')
+            brace_index = node_text.find("{")
             if brace_index != -1:
                 return node_text[:brace_index].strip()
             return node_text.strip()
@@ -288,7 +288,7 @@ class MetadataExtractor:
                             # Look for type annotation
                             for annotation_child in param_child.children:
                                 if annotation_child.type == "type_annotation":
-                                    type_text = content[annotation_child.start_byte:annotation_child.end_byte]
+                                    type_text = content[annotation_child.start_byte : annotation_child.end_byte]
                                     param_types.append(type_text)
             return param_types if param_types else None
         except Exception:
@@ -299,7 +299,7 @@ class MetadataExtractor:
         try:
             for child in node.children:
                 if child.type == "type_annotation":
-                    return content[child.start_byte:child.end_byte]
+                    return content[child.start_byte : child.end_byte]
             return None
         except Exception:
             return None
@@ -312,7 +312,7 @@ class MetadataExtractor:
                 if child.type in ["class_heritage", "extends_clause"]:
                     for heritage_child in child.children:
                         if heritage_child.type == "identifier":
-                            base_class = content[heritage_child.start_byte:heritage_child.end_byte]
+                            base_class = content[heritage_child.start_byte : heritage_child.end_byte]
                             inheritance.append(base_class)
             return inheritance if inheritance else None
         except Exception:
@@ -327,14 +327,14 @@ class MetadataExtractor:
             modifiers = []
             for child in node.children:
                 if child.type == "modifiers":
-                    modifiers_text = content[child.start_byte:child.end_byte]
+                    modifiers_text = content[child.start_byte : child.end_byte]
                     modifiers.append(modifiers_text)
 
             # Return type
             return_type = None
             for child in node.children:
                 if child.type in ["type_identifier", "primitive_type", "generic_type"]:
-                    return_type = content[child.start_byte:child.end_byte]
+                    return_type = content[child.start_byte : child.end_byte]
                     break
 
             # Method name
@@ -367,7 +367,7 @@ class MetadataExtractor:
                             # Get type from formal parameter
                             for type_child in param_child.children:
                                 if type_child.type in ["type_identifier", "primitive_type", "generic_type"]:
-                                    type_text = content[type_child.start_byte:type_child.end_byte]
+                                    type_text = content[type_child.start_byte : type_child.end_byte]
                                     param_types.append(type_text)
                                     break
             return param_types if param_types else None
@@ -379,7 +379,7 @@ class MetadataExtractor:
         try:
             for child in node.children:
                 if child.type in ["type_identifier", "primitive_type", "generic_type", "void_type"]:
-                    return content[child.start_byte:child.end_byte]
+                    return content[child.start_byte : child.end_byte]
             return None
         except Exception:
             return None
@@ -392,7 +392,7 @@ class MetadataExtractor:
                 if child.type == "superclass":
                     for super_child in child.children:
                         if super_child.type == "type_identifier":
-                            base_class = content[super_child.start_byte:super_child.end_byte]
+                            base_class = content[super_child.start_byte : super_child.end_byte]
                             inheritance.append(base_class)
             return inheritance if inheritance else None
         except Exception:
@@ -406,7 +406,7 @@ class MetadataExtractor:
                 if child.type == "super_interfaces":
                     for interface_child in child.children:
                         if interface_child.type == "type_identifier":
-                            interface = content[interface_child.start_byte:interface_child.end_byte]
+                            interface = content[interface_child.start_byte : interface_child.end_byte]
                             interfaces.append(interface)
             return interfaces if interfaces else None
         except Exception:
@@ -415,7 +415,7 @@ class MetadataExtractor:
     def _extract_go_function_signature(self, node: Node, content: str) -> str | None:
         """Extract Go function signature."""
         try:
-            return content[node.start_byte:node.end_byte].split('{')[0].strip()
+            return content[node.start_byte : node.end_byte].split("{")[0].strip()
         except Exception:
             return None
 
@@ -430,7 +430,7 @@ class MetadataExtractor:
                             # Get type from parameter
                             for type_child in param_child.children:
                                 if type_child.type in ["type_identifier", "pointer_type", "slice_type"]:
-                                    type_text = content[type_child.start_byte:type_child.end_byte]
+                                    type_text = content[type_child.start_byte : type_child.end_byte]
                                     param_types.append(type_text)
             return param_types if param_types else None
         except Exception:
@@ -441,7 +441,7 @@ class MetadataExtractor:
         try:
             for child in node.children:
                 if child.type in ["type_identifier", "pointer_type", "slice_type"]:
-                    return content[child.start_byte:child.end_byte]
+                    return content[child.start_byte : child.end_byte]
             return None
         except Exception:
             return None
@@ -449,7 +449,7 @@ class MetadataExtractor:
     def _extract_rust_function_signature(self, node: Node, content: str) -> str | None:
         """Extract Rust function signature."""
         try:
-            return content[node.start_byte:node.end_byte].split('{')[0].strip()
+            return content[node.start_byte : node.end_byte].split("{")[0].strip()
         except Exception:
             return None
 
@@ -464,7 +464,7 @@ class MetadataExtractor:
                             # Get type from parameter
                             for type_child in param_child.children:
                                 if type_child.type in ["type_identifier", "primitive_type", "reference_type"]:
-                                    type_text = content[type_child.start_byte:type_child.end_byte]
+                                    type_text = content[type_child.start_byte : type_child.end_byte]
                                     param_types.append(type_text)
             return param_types if param_types else None
         except Exception:
@@ -475,7 +475,7 @@ class MetadataExtractor:
         try:
             for child in node.children:
                 if child.type in ["type_identifier", "primitive_type", "reference_type"]:
-                    return content[child.start_byte:child.end_byte]
+                    return content[child.start_byte : child.end_byte]
             return None
         except Exception:
             return None
@@ -484,32 +484,32 @@ class MetadataExtractor:
         """Extract import statements from file content."""
         try:
             imports = []
-            lines = content.split('\n')
+            lines = content.split("\n")
 
             if language == "python":
                 for line in lines:
                     stripped = line.strip()
-                    if stripped.startswith('import ') or stripped.startswith('from '):
+                    if stripped.startswith("import ") or stripped.startswith("from "):
                         imports.append(stripped)
             elif language in ["javascript", "typescript"]:
                 for line in lines:
                     stripped = line.strip()
-                    if stripped.startswith('import ') or stripped.startswith('const ') and 'require(' in stripped:
+                    if stripped.startswith("import ") or stripped.startswith("const ") and "require(" in stripped:
                         imports.append(stripped)
             elif language == "java":
                 for line in lines:
                     stripped = line.strip()
-                    if stripped.startswith('import '):
+                    if stripped.startswith("import "):
                         imports.append(stripped)
             elif language == "go":
                 for line in lines:
                     stripped = line.strip()
-                    if stripped.startswith('import ') or (stripped.startswith('"') and '/' in stripped):
+                    if stripped.startswith("import ") or (stripped.startswith('"') and "/" in stripped):
                         imports.append(stripped)
             elif language == "rust":
                 for line in lines:
                     stripped = line.strip()
-                    if stripped.startswith('use '):
+                    if stripped.startswith("use "):
                         imports.append(stripped)
 
             return imports if imports else None
@@ -523,9 +523,16 @@ class MetadataExtractor:
 
             # Count decision points
             decision_types = {
-                "if_statement", "while_statement", "for_statement", "case_clause",
-                "catch_clause", "conditional_expression", "logical_and", "logical_or",
-                "switch_statement", "try_statement"
+                "if_statement",
+                "while_statement",
+                "for_statement",
+                "case_clause",
+                "catch_clause",
+                "conditional_expression",
+                "logical_and",
+                "logical_or",
+                "switch_statement",
+                "try_statement",
             }
 
             def count_decisions(n: Node) -> int:
@@ -558,7 +565,7 @@ class MetadataExtractor:
                 "dependencies": self._extract_dependencies(content, language),
                 "total_functions": 0,
                 "total_classes": 0,
-                "total_lines": len(content.split('\n'))
+                "total_lines": len(content.split("\n")),
             }
 
             # Count semantic constructs
@@ -586,21 +593,21 @@ class MetadataExtractor:
 
             for import_stmt in imports:
                 if language == "python":
-                    if import_stmt.startswith('import '):
-                        module = import_stmt.replace('import ', '').split('.')[0].split(' as ')[0]
+                    if import_stmt.startswith("import "):
+                        module = import_stmt.replace("import ", "").split(".")[0].split(" as ")[0]
                         dependencies.append(module)
-                    elif import_stmt.startswith('from '):
-                        module = import_stmt.split('from ')[1].split(' import')[0].split('.')[0]
+                    elif import_stmt.startswith("from "):
+                        module = import_stmt.split("from ")[1].split(" import")[0].split(".")[0]
                         dependencies.append(module)
                 elif language in ["javascript", "typescript"]:
-                    if 'from ' in import_stmt:
-                        module = import_stmt.split('from ')[1].strip().replace("'", '').replace('"', '')
+                    if "from " in import_stmt:
+                        module = import_stmt.split("from ")[1].strip().replace("'", "").replace('"', "")
                         dependencies.append(module)
-                    elif 'require(' in import_stmt:
-                        start = import_stmt.find('require(') + 8
-                        end = import_stmt.find(')', start)
+                    elif "require(" in import_stmt:
+                        start = import_stmt.find("require(") + 8
+                        end = import_stmt.find(")", start)
                         if end > start:
-                            module = import_stmt[start:end].replace("'", '').replace('"', '')
+                            module = import_stmt[start:end].replace("'", "").replace('"', "")
                             dependencies.append(module)
 
             return list(set(dependencies)) if dependencies else None

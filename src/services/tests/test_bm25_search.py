@@ -101,7 +101,7 @@ class TestBM25SearchEngine:
     def search_engine(self):
         # Use temporary directory for testing
         with tempfile.TemporaryDirectory() as temp_dir:
-            with patch('src.services.bm25_search.get_settings') as mock_settings:
+            with patch("src.services.bm25_search.get_settings") as mock_settings:
                 mock_config = Mock()
                 mock_config.INDEX_CACHE_DIR = Path(temp_dir)
                 mock_settings.return_value = mock_config
@@ -122,7 +122,7 @@ class TestBM25SearchEngine:
                 end_line=3,
                 language="python",
                 semantic_type="function_definition",
-                function_name="authenticate_user"
+                function_name="authenticate_user",
             ),
             CodeChunk(
                 file_path="test2.py",
@@ -135,20 +135,19 @@ class TestBM25SearchEngine:
                 end_line=8,
                 language="python",
                 semantic_type="class_definition",
-                class_name="UserManager"
+                class_name="UserManager",
             ),
             CodeChunk(
                 file_path="test3.js",
                 content=(
-                    "function calculateTotalScore(baseScore, bonusPoints) {\n"
-                    "    return baseScore + bonusPoints;\n}"
+                    "function calculateTotalScore(baseScore, bonusPoints) {\n    return baseScore + bonusPoints;\n}"
                 ),
                 start_line=10,
                 end_line=13,
                 language="javascript",
                 semantic_type="function_definition",
-                function_name="calculateTotalScore"
-            )
+                function_name="calculateTotalScore",
+            ),
         ]
 
     @pytest.mark.asyncio
@@ -207,7 +206,7 @@ class TestBM25SearchEngine:
             start_line=1,
             end_line=2,
             language="python",
-            semantic_type="function_definition"
+            semantic_type="function_definition",
         )
 
         await search_engine.update_index([new_chunk], [])

@@ -25,15 +25,24 @@ class DatabaseMigration:
             columns = [row[1] for row in cursor.fetchall()]
 
             metadata_columns = [
-                'function_signature', 'class_name', 'function_name', 'parameter_types',
-                'return_type', 'inheritance_chain', 'import_statements', 'docstring',
-                'complexity_score', 'dependencies', 'interfaces', 'decorators'
+                "function_signature",
+                "class_name",
+                "function_name",
+                "parameter_types",
+                "return_type",
+                "inheritance_chain",
+                "import_statements",
+                "docstring",
+                "complexity_score",
+                "dependencies",
+                "interfaces",
+                "decorators",
             ]
 
             # Add missing columns
             for column in metadata_columns:
                 if column not in columns:
-                    if column == 'complexity_score':
+                    if column == "complexity_score":
                         conn.execute(f"ALTER TABLE embeddings ADD COLUMN {column} INTEGER")
                     else:
                         conn.execute(f"ALTER TABLE embeddings ADD COLUMN {column} TEXT")

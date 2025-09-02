@@ -54,6 +54,7 @@ class SearchService:
             # Run database migration first
             migration = DatabaseMigration()
             import asyncio
+
             asyncio.create_task(migration.migrate_to_metadata_schema())
 
             # Initialize SQLite database with vector extension
@@ -370,7 +371,7 @@ class SearchService:
 
             for doc_id, _ in bm25_results:
                 # Parse document ID to get file_path and start_line
-                file_path, start_line_str = doc_id.rsplit(':', 1)
+                file_path, start_line_str = doc_id.rsplit(":", 1)
                 start_line = int(start_line_str)
 
                 # Query database for full chunk data
@@ -383,7 +384,7 @@ class SearchService:
                     FROM embeddings
                     WHERE file_path = ? AND start_line = ?
                     """,
-                    (file_path, start_line)
+                    (file_path, start_line),
                 )
 
                 row = cursor.fetchone()

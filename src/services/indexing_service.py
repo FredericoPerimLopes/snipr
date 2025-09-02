@@ -273,9 +273,7 @@ class IndexingService:
             # Use syntactic chunking for better code integrity
             if language in self.parsers:
                 parser = self.parsers[language]
-                return await self.syntactic_chunker.chunk_with_integrity(
-                    str(file_path), content, language, parser
-                )
+                return await self.syntactic_chunker.chunk_with_integrity(str(file_path), content, language, parser)
             else:
                 # Fallback for unsupported languages
                 return await self._basic_chunking(file_path, content, language)
@@ -286,16 +284,16 @@ class IndexingService:
 
     async def _basic_chunking(self, file_path: Path, content: str, language: str) -> list[CodeChunk]:
         """Basic line-based chunking for unsupported languages."""
-        lines = content.split('\n')
+        lines = content.split("\n")
         chunks = []
 
         chunk_size = 15  # lines per chunk
-        overlap = 3     # overlapping lines
+        overlap = 3  # overlapping lines
 
         for i in range(0, len(lines), chunk_size - overlap):
             end_idx = min(i + chunk_size, len(lines))
             chunk_lines = lines[i:end_idx]
-            chunk_content = '\n'.join(chunk_lines)
+            chunk_content = "\n".join(chunk_lines)
 
             if chunk_content.strip():  # Skip empty chunks
                 chunk = CodeChunk(

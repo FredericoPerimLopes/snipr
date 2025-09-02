@@ -50,7 +50,7 @@ class TestSyntacticChunker:
         mock_parser.parse.return_value.root_node.children = [func_node]
 
         # Mock metadata extraction
-        with patch.object(chunker.metadata_extractor, 'extract_all_metadata') as mock_extract:
+        with patch.object(chunker.metadata_extractor, "extract_all_metadata") as mock_extract:
             mock_metadata = Mock()
             mock_metadata.semantic_type = "function_definition"
             mock_metadata.function_name = "small_function"
@@ -89,11 +89,11 @@ class TestSyntacticChunker:
         class_node.children = method_nodes
         mock_parser.parse.return_value.root_node.children = [class_node]
 
-        with patch.object(chunker, '_get_node_char_count') as mock_char_count:
+        with patch.object(chunker, "_get_node_char_count") as mock_char_count:
             # Make class too large, methods small enough
             mock_char_count.side_effect = lambda node, content: 1000 if node.type == "class_definition" else 100
 
-            with patch.object(chunker.metadata_extractor, 'extract_all_metadata') as mock_extract:
+            with patch.object(chunker.metadata_extractor, "extract_all_metadata") as mock_extract:
                 mock_metadata = Mock()
                 mock_metadata.semantic_type = "method_definition"
                 mock_metadata.function_name = f"method_{i}"
@@ -147,7 +147,7 @@ class TestSyntacticChunker:
 
         children = small_nodes + [large_node]
 
-        with patch.object(chunker, '_get_node_char_count') as mock_char_count:
+        with patch.object(chunker, "_get_node_char_count") as mock_char_count:
             # Small nodes: 100 chars each, large node: 800 chars
             mock_char_count.side_effect = lambda node, content: 800 if node.type == "large_function" else 100
 
@@ -162,8 +162,7 @@ class TestSyntacticChunker:
 
             # Find group with single large node
             large_node_group = next(
-                (group for group in groups if len(group) == 1 and group[0].type == "large_function"),
-                None
+                (group for group in groups if len(group) == 1 and group[0].type == "large_function"), None
             )
             assert large_node_group is not None
 
@@ -177,7 +176,7 @@ class TestSyntacticChunker:
             start_line=1,
             end_line=1,
             language="python",
-            semantic_type="variable_declaration"
+            semantic_type="variable_declaration",
         )
 
         small_chunk2 = CodeChunk(
@@ -186,7 +185,7 @@ class TestSyntacticChunker:
             start_line=2,
             end_line=2,
             language="python",
-            semantic_type="variable_declaration"
+            semantic_type="variable_declaration",
         )
 
         large_chunk = CodeChunk(
@@ -195,20 +194,20 @@ class TestSyntacticChunker:
             start_line=5,
             end_line=25,
             language="python",
-            semantic_type="function_definition"
+            semantic_type="function_definition",
         )
 
         chunks = [small_chunk1, small_chunk2, large_chunk]
         content = "x = 1\ny = 2\n\ndef large_function():\n" + "    pass\n" * 20
 
-        with patch.object(chunker, '_try_merge_chunks') as mock_merge:
+        with patch.object(chunker, "_try_merge_chunks") as mock_merge:
             merged_chunk = CodeChunk(
                 file_path="test.py",
                 content="x = 1\ny = 2",
                 start_line=1,
                 end_line=2,
                 language="python",
-                semantic_type="variable_declaration"
+                semantic_type="variable_declaration",
             )
             mock_merge.return_value = merged_chunk
 
@@ -239,7 +238,7 @@ class TestSyntacticChunker:
         node.end_byte = len(content)
         node.children = []
 
-        with patch.object(chunker.metadata_extractor, 'extract_all_metadata') as mock_extract:
+        with patch.object(chunker.metadata_extractor, "extract_all_metadata") as mock_extract:
             mock_metadata = Mock()
             mock_metadata.semantic_type = "function_definition"
             mock_metadata.function_name = "test_function"
@@ -288,7 +287,8 @@ class TestClass:
         class_node.children = [init_node, get_node]
         mock_parser.parse.return_value.root_node.children = [class_node]
 
-        with patch.object(chunker.metadata_extractor, 'extract_all_metadata') as mock_extract:
+        with patch.object(chunker.metadata_extractor, "extract_all_metadata") as mock_extract:
+
             def mock_metadata_response(node, content, language):
                 metadata = Mock()
                 if node.type == "class_definition":
@@ -303,7 +303,7 @@ class TestClass:
 
             mock_extract.side_effect = mock_metadata_response
 
-            with patch.object(chunker, '_get_node_char_count', return_value=200):
+            with patch.object(chunker, "_get_node_char_count", return_value=200):
                 chunks = await chunker.chunk_with_integrity("test.py", content, "python", mock_parser)
 
                 assert len(chunks) > 0

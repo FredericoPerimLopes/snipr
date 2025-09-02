@@ -213,18 +213,14 @@ async def search_bm25(query: str, language: str | None = None, max_results: int 
             "total_matches": len(results),
             "search_type": "bm25",
             "query": query,
-            "message": f"Found {len(results)} BM25 matches"
+            "message": f"Found {len(results)} BM25 matches",
         }
 
         return json.dumps(response)
 
     except Exception as e:
         logger.error(f"Error in BM25 search: {e}")
-        return json.dumps({
-            "status": "error",
-            "message": f"BM25 search failed: {e!s}",
-            "error_type": type(e).__name__
-        })
+        return json.dumps({"status": "error", "message": f"BM25 search failed: {e!s}", "error_type": type(e).__name__})
 
 
 async def search_metadata(query: str, language: str | None = None, max_results: int = 10) -> str:
@@ -247,18 +243,16 @@ async def search_metadata(query: str, language: str | None = None, max_results: 
             "total_matches": len(results),
             "search_type": "metadata",
             "query": query,
-            "message": f"Found {len(results)} metadata matches"
+            "message": f"Found {len(results)} metadata matches",
         }
 
         return json.dumps(response)
 
     except Exception as e:
         logger.error(f"Error in metadata search: {e}")
-        return json.dumps({
-            "status": "error",
-            "message": f"Metadata search failed: {e!s}",
-            "error_type": type(e).__name__
-        })
+        return json.dumps(
+            {"status": "error", "message": f"Metadata search failed: {e!s}", "error_type": type(e).__name__}
+        )
 
 
 async def search_functions(function_name: str = None, return_type: str = None, language: str = None) -> str:
@@ -274,9 +268,7 @@ async def search_functions(function_name: str = None, return_type: str = None, l
     """
     try:
         results = await metadata_search_engine.search_functions(
-            function_name=function_name,
-            return_type=return_type,
-            language=language
+            function_name=function_name, return_type=return_type, language=language
         )
 
         response = {
@@ -284,23 +276,17 @@ async def search_functions(function_name: str = None, return_type: str = None, l
             "results": [chunk.model_dump() for chunk in results],
             "total_matches": len(results),
             "search_type": "function_metadata",
-            "criteria": {
-                "function_name": function_name,
-                "return_type": return_type,
-                "language": language
-            },
-            "message": f"Found {len(results)} matching functions"
+            "criteria": {"function_name": function_name, "return_type": return_type, "language": language},
+            "message": f"Found {len(results)} matching functions",
         }
 
         return json.dumps(response)
 
     except Exception as e:
         logger.error(f"Error in function search: {e}")
-        return json.dumps({
-            "status": "error",
-            "message": f"Function search failed: {e!s}",
-            "error_type": type(e).__name__
-        })
+        return json.dumps(
+            {"status": "error", "message": f"Function search failed: {e!s}", "error_type": type(e).__name__}
+        )
 
 
 async def search_classes(class_name: str = None, inherits_from: str = None, language: str = None) -> str:
@@ -316,9 +302,7 @@ async def search_classes(class_name: str = None, inherits_from: str = None, lang
     """
     try:
         results = await metadata_search_engine.search_classes(
-            class_name=class_name,
-            inherits_from=inherits_from,
-            language=language
+            class_name=class_name, inherits_from=inherits_from, language=language
         )
 
         response = {
@@ -326,20 +310,12 @@ async def search_classes(class_name: str = None, inherits_from: str = None, lang
             "results": [chunk.model_dump() for chunk in results],
             "total_matches": len(results),
             "search_type": "class_metadata",
-            "criteria": {
-                "class_name": class_name,
-                "inherits_from": inherits_from,
-                "language": language
-            },
-            "message": f"Found {len(results)} matching classes"
+            "criteria": {"class_name": class_name, "inherits_from": inherits_from, "language": language},
+            "message": f"Found {len(results)} matching classes",
         }
 
         return json.dumps(response)
 
     except Exception as e:
         logger.error(f"Error in class search: {e}")
-        return json.dumps({
-            "status": "error",
-            "message": f"Class search failed: {e!s}",
-            "error_type": type(e).__name__
-        })
+        return json.dumps({"status": "error", "message": f"Class search failed: {e!s}", "error_type": type(e).__name__})
