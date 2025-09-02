@@ -192,6 +192,7 @@ async def get_search_stats() -> str:
             {"status": "error", "message": f"Failed to get search stats: {e!s}", "error_type": type(e).__name__}
         )
 
+
 async def search_bm25(query: str, language: str | None = None, max_results: int = 10) -> str:
     """BM25 lexical search for exact keyword matching.
 

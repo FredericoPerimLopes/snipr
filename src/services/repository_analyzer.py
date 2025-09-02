@@ -658,13 +658,13 @@ class ContextualReranker:
         """Calculate relevance based on function calls in content."""
         query_words = set(query.lower().split())
         content_lower = content.lower()
-        
+
         # Count matches using substring matching
         matches = 0
         for query_word in query_words:
             if query_word in content_lower:
                 matches += 1
-        
+
         return matches / len(query_words) if query_words else 0.0
 
     async def _calculate_cluster_similarity(self, chunk: CodeChunk, graph: ModuleGraph) -> float:

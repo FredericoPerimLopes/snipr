@@ -1,13 +1,12 @@
-import math
-import logging
-import time
-import asyncio
-from typing import Any
-from dataclasses import dataclass, asdict
-from pathlib import Path
 import json
+import logging
+import math
+import time
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Any
 
-from ..models.indexing_models import CodeChunk, SearchRequest, SearchResponse
+from ..models.indexing_models import CodeChunk, SearchRequest
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +48,7 @@ class SearchQualityMetrics:
                 expected_classes=["UserManager", "AuthService", "LoginHandler"],
                 expected_files=["auth.py", "authentication.py", "login.py"],
                 language="python",
-                query_type="function"
+                query_type="function",
             ),
             BenchmarkQuery(
                 query="async database operations",
@@ -57,7 +56,7 @@ class SearchQualityMetrics:
                 expected_classes=["DatabaseManager", "AsyncRepository"],
                 expected_files=["database.py", "db.py", "repository.py"],
                 language="python",
-                query_type="function"
+                query_type="function",
             ),
             BenchmarkQuery(
                 query="React component state management",
@@ -65,7 +64,7 @@ class SearchQualityMetrics:
                 expected_classes=["Component", "StateManager"],
                 expected_files=["component.jsx", "state.js", "hooks.js"],
                 language="javascript",
-                query_type="class"
+                query_type="class",
             ),
             BenchmarkQuery(
                 query="error handling patterns",
@@ -73,7 +72,7 @@ class SearchQualityMetrics:
                 expected_classes=["ErrorHandler", "Exception", "CustomError"],
                 expected_files=["errors.py", "exceptions.py", "error_handler.py"],
                 language="python",
-                query_type="general"
+                query_type="general",
             ),
             BenchmarkQuery(
                 query="configuration management",
@@ -81,15 +80,12 @@ class SearchQualityMetrics:
                 expected_classes=["Config", "Settings", "ConfigManager"],
                 expected_files=["config.py", "settings.py", "configuration.py"],
                 language="python",
-                query_type="general"
-            )
+                query_type="general",
+            ),
         ]
 
     async def evaluate_search_method(
-        self,
-        search_function,
-        method_name: str,
-        queries: list[BenchmarkQuery] = None
+        self, search_function, method_name: str, queries: list[BenchmarkQuery] = None
     ) -> dict[str, Any]:
         """Evaluate a search method against benchmark queries."""
         if queries is None:
@@ -109,24 +105,20 @@ class SearchQualityMetrics:
                 total_time += query_time
 
                 # Evaluate results
-                quality_result = await self._evaluate_query_results(
-                    query, search_results, query_time
-                )
+                quality_result = await self._evaluate_query_results(query, search_results, query_time)
 
-                results.append({
-                    "query": query.query,
-                    "language": query.language,
-                    "query_type": query.query_type,
-                    "metrics": asdict(quality_result)
-                })
+                results.append(
+                    {
+                        "query": query.query,
+                        "language": query.language,
+                        "query_type": query.query_type,
+                        "metrics": asdict(quality_result),
+                    }
+                )
 
             except Exception as e:
                 logger.error(f"Error evaluating query '{query.query}': {e}")
-                results.append({
-                    "query": query.query,
-                    "error": str(e),
-                    "metrics": None
-                })
+                results.append({"query": query.query, "error": str(e), "metrics": None})
 
         # Calculate aggregate metrics
         valid_results = [r for r in results if r.get("metrics")]
@@ -137,7 +129,7 @@ class SearchQualityMetrics:
                 "total_queries": len(queries),
                 "successful_queries": 0,
                 "aggregate_metrics": None,
-                "individual_results": results
+                "individual_results": results,
             }
 
         aggregate_metrics = self._calculate_aggregate_metrics(valid_results)
@@ -148,14 +140,11 @@ class SearchQualityMetrics:
             "successful_queries": len(valid_results),
             "average_query_time_ms": total_time / len(queries),
             "aggregate_metrics": aggregate_metrics,
-            "individual_results": results
+            "individual_results": results,
         }
 
     async def _evaluate_query_results(
-        self,
-        query: BenchmarkQuery,
-        results: list[CodeChunk],
-        query_time: float
+        self, query: BenchmarkQuery, results: list[CodeChunk], query_time: float
     ) -> SearchQualityResult:
         """Evaluate search results against expected outcomes."""
         # Create relevance sets
@@ -181,23 +170,19 @@ class SearchQualityMetrics:
             # Check function relevance
             if chunk.function_name:
                 retrieved_items.add(f"function:{chunk.function_name}")
-                relevance_scores.append(self._calculate_relevance_score(
-                    f"function:{chunk.function_name}", relevant_items
-                ))
+                relevance_scores.append(
+                    self._calculate_relevance_score(f"function:{chunk.function_name}", relevant_items)
+                )
 
             # Check class relevance
             if chunk.class_name:
                 retrieved_items.add(f"class:{chunk.class_name}")
-                relevance_scores.append(self._calculate_relevance_score(
-                    f"class:{chunk.class_name}", relevant_items
-                ))
+                relevance_scores.append(self._calculate_relevance_score(f"class:{chunk.class_name}", relevant_items))
 
             # Check file relevance
             file_name = Path(chunk.file_path).name
             retrieved_items.add(f"file:{file_name}")
-            relevance_scores.append(self._calculate_relevance_score(
-                f"file:{file_name}", relevant_items
-            ))
+            relevance_scores.append(self._calculate_relevance_score(f"file:{file_name}", relevant_items))
 
         # Calculate metrics
         precision_at_5 = self._precision_at_k(retrieved_items, relevant_items, 5, results)
@@ -217,7 +202,7 @@ class SearchQualityMetrics:
             mean_average_precision=map_score,
             ndcg_at_5=ndcg_5,
             ndcg_at_10=ndcg_10,
-            query_time_ms=query_time
+            query_time_ms=query_time,
         )
 
     def _precision_at_k(self, retrieved: set[str], relevant: set[str], k: int, results: list[CodeChunk]) -> float:
@@ -257,10 +242,7 @@ class SearchQualityMetrics:
         return len(relevant_retrieved) / len(relevant)
 
     def _mean_average_precision(
-        self,
-        queries: list[BenchmarkQuery],
-        results_list: list[list[CodeChunk]],
-        relevant_sets: list[set[str]]
+        self, queries: list[BenchmarkQuery], results_list: list[list[CodeChunk]], relevant_sets: list[set[str]]
     ) -> float:
         """Calculate Mean Average Precision across queries."""
         if not queries:
@@ -338,8 +320,14 @@ class SearchQualityMetrics:
         """Calculate aggregate metrics across all queries."""
         metrics = {}
         metric_names = [
-            "precision_at_5", "precision_at_10", "recall_at_5", "recall_at_10",
-            "mean_average_precision", "ndcg_at_5", "ndcg_at_10", "query_time_ms"
+            "precision_at_5",
+            "precision_at_10",
+            "recall_at_5",
+            "recall_at_10",
+            "mean_average_precision",
+            "ndcg_at_5",
+            "ndcg_at_10",
+            "query_time_ms",
         ]
 
         for metric_name in metric_names:
@@ -362,8 +350,9 @@ class CodeRetrievalMetrics:
 
         # Basic keyword overlap scoring with better tokenization
         import re
-        query_words = set(re.findall(r'\b\w+\b', query_lower))
-        content_words = set(re.findall(r'\b\w+\b', content_lower))
+
+        query_words = set(re.findall(r"\b\w+\b", query_lower))
+        content_words = set(re.findall(r"\b\w+\b", content_lower))
 
         overlap = query_words.intersection(content_words)
         if not query_words:
@@ -380,7 +369,7 @@ class CodeRetrievalMetrics:
                     metadata_boost += 0.4  # Increased boost for function name matches
                 # Also check for root word matches (like "authenticate" vs "authentication")
                 elif len(word) > 4:
-                    for part in function_lower.split('_'):
+                    for part in function_lower.split("_"):
                         if len(part) > 4:
                             # Check if they share a common root (first 70% of characters)
                             min_len = min(len(word), len(part))
@@ -469,9 +458,7 @@ class PerformanceBenchmark:
         self.results_history = []
 
     async def benchmark_search_methods(
-        self,
-        search_services: dict[str, Any],
-        test_queries: list[str] = None
+        self, search_services: dict[str, Any], test_queries: list[str] = None
     ) -> dict[str, Any]:
         """Compare performance across different search methods."""
         if test_queries is None:
@@ -480,7 +467,7 @@ class PerformanceBenchmark:
                 "database operations",
                 "error handling",
                 "async functions",
-                "class inheritance"
+                "class inheritance",
             ]
 
         benchmark_results = {}
@@ -492,7 +479,7 @@ class PerformanceBenchmark:
                 "total_queries": len(test_queries),
                 "response_times": [],
                 "success_rate": 0.0,
-                "avg_results_per_query": 0.0
+                "avg_results_per_query": 0.0,
             }
 
             successful_queries = 0
@@ -502,10 +489,10 @@ class PerformanceBenchmark:
                 start_time = time.time()
 
                 try:
-                    if hasattr(search_service, 'search'):
+                    if hasattr(search_service, "search"):
                         request = SearchRequest(query=query, max_results=10)
                         response = await search_service.search(request)
-                        results = response.results if hasattr(response, 'results') else response
+                        results = response.results if hasattr(response, "results") else response
                     else:
                         results = await search_service(query)
 
@@ -522,23 +509,21 @@ class PerformanceBenchmark:
 
             # Calculate aggregate stats
             response_times = [t for t in method_results["response_times"] if t > 0]
-            method_results.update({
-                "success_rate": successful_queries / len(test_queries),
-                "avg_results_per_query": total_results / successful_queries if successful_queries > 0 else 0,
-                "avg_response_time_ms": sum(response_times) / len(response_times) if response_times else 0,
-                "p95_response_time_ms": self._percentile(response_times, 95) if response_times else 0,
-                "p99_response_time_ms": self._percentile(response_times, 99) if response_times else 0
-            })
+            method_results.update(
+                {
+                    "success_rate": successful_queries / len(test_queries),
+                    "avg_results_per_query": total_results / successful_queries if successful_queries > 0 else 0,
+                    "avg_response_time_ms": sum(response_times) / len(response_times) if response_times else 0,
+                    "p95_response_time_ms": self._percentile(response_times, 95) if response_times else 0,
+                    "p99_response_time_ms": self._percentile(response_times, 99) if response_times else 0,
+                }
+            )
 
             benchmark_results[method_name] = method_results
 
         return benchmark_results
 
-    async def benchmark_scalability(
-        self,
-        search_service,
-        chunk_counts: list[int] = None
-    ) -> dict[str, Any]:
+    async def benchmark_scalability(self, search_service, chunk_counts: list[int] = None) -> dict[str, Any]:
         """Test search performance with different index sizes."""
         if chunk_counts is None:
             chunk_counts = [100, 1000, 5000, 10000]
@@ -573,7 +558,7 @@ class PerformanceBenchmark:
             scalability_results[count] = {
                 "indexing_time_ms": index_time,
                 "avg_search_time_ms": sum(search_times) / len(search_times) if search_times else 0,
-                "chunks_per_second": count / (index_time / 1000) if index_time > 0 else 0
+                "chunks_per_second": count / (index_time / 1000) if index_time > 0 else 0,
             }
 
         return scalability_results
@@ -590,7 +575,7 @@ class PerformanceBenchmark:
                 end_line=i * 3 + 2,
                 language="python",
                 semantic_type="function_definition",
-                function_name=f"test_function_{i}"
+                function_name=f"test_function_{i}",
             )
             chunks.append(chunk)
 
@@ -613,11 +598,7 @@ class SearchQualityDashboard:
     def __init__(self):
         self.metrics_history = []
 
-    async def generate_quality_report(
-        self,
-        search_services: dict[str, Any],
-        output_path: str = None
-    ) -> dict[str, Any]:
+    async def generate_quality_report(self, search_services: dict[str, Any], output_path: str = None) -> dict[str, Any]:
         """Generate comprehensive quality report."""
         quality_metrics = SearchQualityMetrics()
         performance_benchmark = PerformanceBenchmark()
@@ -626,35 +607,28 @@ class SearchQualityDashboard:
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
             "search_methods": {},
             "performance_benchmarks": {},
-            "code_quality_analysis": {}
+            "code_quality_analysis": {},
         }
 
         # Evaluate each search method
         for method_name, service in search_services.items():
             logger.info(f"Evaluating {method_name} search quality...")
 
-            evaluation = await quality_metrics.evaluate_search_method(
-                service, method_name
-            )
+            evaluation = await quality_metrics.evaluate_search_method(service, method_name)
             report["search_methods"][method_name] = evaluation
 
         # Performance benchmarking
-        report["performance_benchmarks"] = await performance_benchmark.benchmark_search_methods(
-            search_services
-        )
+        report["performance_benchmarks"] = await performance_benchmark.benchmark_search_methods(search_services)
 
         # Save report if path provided
         if output_path:
-            with open(output_path, 'w') as f:
+            with open(output_path, "w") as f:
                 json.dump(report, f, indent=2)
 
         return report
 
     async def compare_search_methods(
-        self,
-        baseline_service,
-        enhanced_service,
-        test_queries: list[str] = None
+        self, baseline_service, enhanced_service, test_queries: list[str] = None
     ) -> dict[str, Any]:
         """Compare baseline vs enhanced search performance."""
         if test_queries is None:
@@ -662,33 +636,23 @@ class SearchQualityDashboard:
                 "authentication functions",
                 "database connection",
                 "error handling classes",
-                "async operations"
+                "async operations",
             ]
 
-        comparison = {
-            "baseline_results": [],
-            "enhanced_results": [],
-            "improvements": {}
-        }
+        comparison = {"baseline_results": [], "enhanced_results": [], "improvements": {}}
 
         quality_metrics = SearchQualityMetrics()
 
         # Test baseline
-        baseline_eval = await quality_metrics.evaluate_search_method(
-            baseline_service, "baseline"
-        )
+        baseline_eval = await quality_metrics.evaluate_search_method(baseline_service, "baseline")
         comparison["baseline_results"] = baseline_eval
 
         # Test enhanced
-        enhanced_eval = await quality_metrics.evaluate_search_method(
-            enhanced_service, "enhanced"
-        )
+        enhanced_eval = await quality_metrics.evaluate_search_method(enhanced_service, "enhanced")
         comparison["enhanced_results"] = enhanced_eval
 
         # Calculate improvements
-        if (baseline_eval.get("aggregate_metrics") and
-            enhanced_eval.get("aggregate_metrics")):
-
+        if baseline_eval.get("aggregate_metrics") and enhanced_eval.get("aggregate_metrics"):
             baseline_metrics = baseline_eval["aggregate_metrics"]
             enhanced_metrics = enhanced_eval["aggregate_metrics"]
 
@@ -702,7 +666,7 @@ class SearchQualityDashboard:
                         comparison["improvements"][metric] = {
                             "baseline": baseline_val,
                             "enhanced": enhanced_val,
-                            "improvement_percent": improvement
+                            "improvement_percent": improvement,
                         }
 
         return comparison
