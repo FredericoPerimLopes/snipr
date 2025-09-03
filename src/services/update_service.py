@@ -370,10 +370,10 @@ class IncrementalUpdateService:
         exclude_patterns = self.config.DEFAULT_EXCLUDE_PATTERNS
 
         import os
-        
+
         for root, dirs, files in os.walk(codebase_path):
             root_path = Path(root)
-            
+
             # Filter out excluded directories
             dirs[:] = [d for d in dirs if not self._should_exclude_path(root_path / d, exclude_patterns)]
 
