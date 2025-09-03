@@ -72,7 +72,7 @@ class IncrementalUpdateService:
             new_files = []
             deleted_files = []
 
-            for line in result.stdout.strip().split('\n'):
+            for line in result.stdout.strip().split("\n"):
                 if not line:
                     continue
 
@@ -85,15 +85,15 @@ class IncrementalUpdateService:
 
                 full_path = str(codebase_path / file_path)
 
-                if status.startswith('M') or status.startswith(' M'):
+                if status.startswith("M") or status.startswith(" M"):
                     modified_files.append(full_path)
-                elif status.startswith('A') or status.startswith('??'):
+                elif status.startswith("A") or status.startswith("??"):
                     new_files.append(full_path)
-                elif status.startswith('D'):
+                elif status.startswith("D"):
                     deleted_files.append(full_path)
-                elif status.startswith('R'):  # Renamed
+                elif status.startswith("R"):  # Renamed
                     # For renames, treat as delete old + add new
-                    parts = file_path.split(' -> ')
+                    parts = file_path.split(" -> ")
                     if len(parts) == 2:
                         deleted_files.append(str(codebase_path / parts[0]))
                         new_files.append(str(codebase_path / parts[1]))
@@ -236,17 +236,17 @@ class IncrementalUpdateService:
 
         # Match: import module, from module import ...
         import_patterns = [
-            r'^import\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)',
-            r'^from\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)\s+import',
+            r"^import\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)",
+            r"^from\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)\s+import",
         ]
 
-        for line in content.split('\n'):
+        for line in content.split("\n"):
             line = line.strip()
             for pattern in import_patterns:
                 match = re.match(pattern, line)
                 if match:
                     module = match.group(1)
-                    if not module.startswith('.'):  # Skip relative imports for now
+                    if not module.startswith("."):  # Skip relative imports for now
                         imports.append(module)
 
         return imports
@@ -259,8 +259,8 @@ class IncrementalUpdateService:
 
         # Match: import ... from 'module', require('module')
         patterns = [
-            r'''import.*?from\s+['"`]([^'"`]+)['"`]''',
-            r'''require\s*\(\s*['"`]([^'"`]+)['"`]\s*\)''',
+            r"""import.*?from\s+['"`]([^'"`]+)['"`]""",
+            r"""require\s*\(\s*['"`]([^'"`]+)['"`]\s*\)""",
         ]
 
         for pattern in patterns:
@@ -276,14 +276,14 @@ class IncrementalUpdateService:
         imports = []
 
         # Match Go import blocks and single imports
-        import_block_pattern = r'import\s*\(\s*(.*?)\s*\)'
+        import_block_pattern = r"import\s*\(\s*(.*?)\s*\)"
         single_import_pattern = r'import\s+"([^"]+)"'
 
         # Find import blocks
         for match in re.finditer(import_block_pattern, content, re.DOTALL):
             block_content = match.group(1)
             # Extract individual imports from block
-            for line in block_content.split('\n'):
+            for line in block_content.split("\n"):
                 line = line.strip()
                 if line and line.startswith('"') and line.endswith('"'):
                     imports.append(line[1:-1])
@@ -303,7 +303,7 @@ class IncrementalUpdateService:
         # Match #include "file.h" and #include <file.h>
         patterns = [
             r'#include\s*"([^"]+)"',
-            r'#include\s*<([^>]+)>',
+            r"#include\s*<([^>]+)>",
         ]
 
         for pattern in patterns:
@@ -315,7 +315,7 @@ class IncrementalUpdateService:
     def _resolve_dependency_path(self, dependency: str, source_file: Path, codebase_path: Path) -> str | None:
         """Resolve dependency to actual file path."""
         # For now, simplified resolution - can be enhanced later
-        if dependency.startswith('.'):
+        if dependency.startswith("."):
             # Relative import
             return None  # Skip for now
 
@@ -438,18 +438,14 @@ class IncrementalUpdateService:
                 record_dict["last_indexed"] = record.last_indexed.isoformat()
                 data[file_path] = record_dict
 
-            with open(metadata_file, 'w') as f:
+            with open(metadata_file, "w") as f:
                 json.dump(data, f, indent=2)
 
         except Exception as e:
             logger.error(f"Error saving file records: {e}")
 
     async def update_file_record(
-        self,
-        file_path: str,
-        content_hash: str,
-        chunk_ids: list[str],
-        dependencies: list[str]
+        self, file_path: str, content_hash: str, chunk_ids: list[str], dependencies: list[str]
     ) -> None:
         """Update record for a processed file."""
         record = FileUpdateRecord(

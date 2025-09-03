@@ -19,6 +19,7 @@ class SearchRequest(BaseModel):
 
 class ChunkType(Enum):
     """Semantic types for code chunks."""
+
     FILE = "file"
     CLASS = "class"
     FUNCTION = "function"
@@ -75,6 +76,7 @@ class IndexingResponse(BaseModel):
 
 class FileUpdateRecord(BaseModel):
     """Track file state for incremental updates."""
+
     file_path: str
     content_hash: str
     last_indexed: datetime
@@ -84,6 +86,7 @@ class FileUpdateRecord(BaseModel):
 
 class IndexUpdateResult(BaseModel):
     """Result of incremental update operation."""
+
     updated_chunks: list[str]
     deleted_chunks: list[str]
     affected_files: list[str]

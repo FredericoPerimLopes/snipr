@@ -21,7 +21,7 @@ async def search_code(
     max_results: int = 10,
     similarity_threshold: float = 0.7,
     codebase_path: str | None = None,
-    auto_sync: bool = True
+    auto_sync: bool = True,
 ) -> str:
     """Search for semantically similar code chunks with automatic index syncing.
 
