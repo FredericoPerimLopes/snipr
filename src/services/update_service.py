@@ -52,6 +52,22 @@ class IncrementalUpdateService:
         except Exception:
             return False
 
+    def _find_git_root(self, path: Path) -> Path | None:
+        """Find the git repository root from given path."""
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "--show-toplevel"],
+                cwd=path,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if result.returncode == 0:
+                return Path(result.stdout.strip())
+            return None
+        except Exception:
+            return None
+
     async def _detect_git_changes(self, codebase_path: Path) -> tuple[list[str], list[str], list[str]]:
         """Use git to detect changes efficiently."""
         try:
@@ -76,14 +92,35 @@ class IncrementalUpdateService:
                 if not line:
                     continue
 
-                status = line[:2]
-                file_path = line[3:].strip()
+                # Git status format: XY filename where X and Y are status characters
+                # Each can be space, M, A, D, R, C, U, ?, !
+                if len(line) < 3:
+                    continue
+                    
+                status = line[:2]  # First two characters are status
+                file_path = line[2:].strip()  # Rest is filename, strip any leading space
 
                 # Skip non-source files
                 if not self._is_source_file(file_path):
                     continue
 
-                full_path = str(codebase_path / file_path)
+                # Git status returns paths relative to repository root
+                # We need to check if the file_path is already absolute or relative to repo root
+                if Path(file_path).is_absolute():
+                    full_path = file_path
+                else:
+                    # Check if this is a path relative to the git repo root
+                    # by seeing if the current codebase_path contains the file_path
+                    potential_path = codebase_path / file_path
+                    if potential_path.exists():
+                        full_path = str(potential_path)
+                    else:
+                        # Try going up to find the git root and construct path from there
+                        git_root = self._find_git_root(codebase_path)
+                        if git_root:
+                            full_path = str(git_root / file_path)
+                        else:
+                            full_path = str(codebase_path / file_path)
 
                 if status.startswith("M") or status.startswith(" M"):
                     modified_files.append(full_path)
@@ -113,6 +150,7 @@ class IncrementalUpdateService:
         current_files = await self._discover_source_files(codebase_path)
         current_file_set = {str(f) for f in current_files}
         stored_file_set = set(self.file_records.keys())
+        
 
         modified_files = []
         new_files = []
