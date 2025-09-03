@@ -45,12 +45,10 @@ except ImportError:
 
 from ..config import get_settings, validate_codebase_path
 from ..models.indexing_models import (
-    ChunkType,
     CodeChunk,
     IndexingRequest,
     IndexingResponse,
     IndexingStatus,
-    IndexUpdateResult,
 )
 from .metadata_extractor import MetadataExtractor
 from .syntactic_chunker import SyntacticChunker
@@ -708,7 +706,7 @@ class IndexingService:
 
     async def get_changed_files(self, codebase_path: str) -> tuple[list[Path], list[Path], list[Path]]:
         """Detect which files have changed, been added, or deleted.
-        
+
         Delegates to update_service for enhanced change detection.
 
         Returns:
@@ -716,10 +714,10 @@ class IndexingService:
         """
         # Delegate to enhanced update service
         modified_strs, new_strs, deleted_strs = await self.update_service.detect_changes(codebase_path)
-        
+
         # Convert strings back to Path objects for backward compatibility
         modified_files = [Path(f) for f in modified_strs]
         new_files = [Path(f) for f in new_strs]
         deleted_files = [Path(f) for f in deleted_strs]
-        
+
         return modified_files, new_files, deleted_files
