@@ -46,6 +46,7 @@ except ImportError:
 from ..config import get_settings, validate_codebase_path
 from ..models.indexing_models import (
     CodeChunk,
+    FileUpdateRecord,
     IndexingRequest,
     IndexingResponse,
     IndexingStatus,
@@ -603,6 +604,26 @@ class IndexingService:
         metadata_path = self.config.INDEX_CACHE_DIR / "index_metadata.json"
         with open(metadata_path, "w") as f:
             json.dump(metadata, f, indent=2)
+            
+        # Also update the update service file records for proper change detection
+        from datetime import datetime
+        for chunk in chunks:
+            file_path = Path(chunk.file_path)
+            if file_path.exists():
+                file_hash = metadata["file_hashes"].get(str(file_path))
+                if file_hash:
+                    # Generate chunk IDs for the file
+                    file_chunk_ids = [f"{file_path.name}:{chunk.start_line}-{chunk.end_line}" 
+                                      for chunk in chunks if chunk.file_path == str(file_path)]
+                    
+                    record = FileUpdateRecord(
+                        file_path=str(file_path),
+                        content_hash=file_hash,
+                        last_indexed=datetime.now(),
+                        chunk_ids=file_chunk_ids,
+                        dependencies=[]  # Will be populated by dependency analysis
+                    )
+                    await self.update_service.store_file_record(record)
 
     async def _update_index_metadata(
         self, codebase_path: Path, updated_files: list[Path], deleted_files: list[Path]

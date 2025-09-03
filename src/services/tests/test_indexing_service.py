@@ -58,16 +58,18 @@ class Counter {
     shutil.rmtree(temp_dir)
 
 
-@pytest.fixture
+@pytest.fixture  
 def mock_config():
     """Mock configuration for testing."""
-    with patch("src.services.indexing_service.get_settings") as mock_settings:
+    with patch("src.services.indexing_service.get_settings") as mock_indexing_settings, \
+         patch("src.services.update_service.get_settings") as mock_update_settings:
         config = Mock()
         config.INDEX_CACHE_DIR = Path(tempfile.mkdtemp())
         config.MAX_FILE_SIZE_MB = 10
         config.DEFAULT_EXCLUDE_PATTERNS = ["**/.git/**", "**/node_modules/**"]
         config.SUPPORTED_LANGUAGES = ["python", "javascript"]
-        mock_settings.return_value = config
+        mock_indexing_settings.return_value = config
+        mock_update_settings.return_value = config
         yield config
 
 
@@ -241,6 +243,14 @@ class TestIndexingService:
         """Test changed file detection with file modifications."""
         from ...models.indexing_models import CodeChunk
 
+        # Clean up any existing file records from previous tests
+        file_records_path = mock_config.INDEX_CACHE_DIR / "file_records.json"
+        if file_records_path.exists():
+            file_records_path.unlink()
+            
+        # Also clear the update service's in-memory records
+        indexing_service.update_service.file_records.clear()
+
         # Create initial metadata
         chunks = [
             CodeChunk(
@@ -253,6 +263,10 @@ class TestIndexingService:
             )
         ]
         await indexing_service._store_index_metadata(temp_codebase, chunks)
+
+        # Small delay to ensure mtime difference
+        import time
+        time.sleep(0.1)
 
         # Modify the test file
         (temp_codebase / "test.py").write_text("def modified_test(): return 'changed'")
@@ -276,6 +290,13 @@ class TestIndexingService:
         metadata_path = indexing_service.config.INDEX_CACHE_DIR / "index_metadata.json"
         if metadata_path.exists():
             metadata_path.unlink()
+            
+        file_records_path = mock_config.INDEX_CACHE_DIR / "file_records.json"
+        if file_records_path.exists():
+            file_records_path.unlink()
+            
+        # Also clear the update service's in-memory records
+        indexing_service.update_service.file_records.clear()
 
         # First index
         request = IndexingRequest(codebase_path=str(temp_codebase), languages=None, exclude_patterns=None)
@@ -298,12 +319,23 @@ class TestIndexingService:
         metadata_path = indexing_service.config.INDEX_CACHE_DIR / "index_metadata.json"
         if metadata_path.exists():
             metadata_path.unlink()
+            
+        file_records_path = mock_config.INDEX_CACHE_DIR / "file_records.json"
+        if file_records_path.exists():
+            file_records_path.unlink()
+            
+        # Also clear the update service's in-memory records
+        indexing_service.update_service.file_records.clear()
 
         # First index
         request = IndexingRequest(codebase_path=str(temp_codebase), languages=None, exclude_patterns=None)
 
         first_result = await indexing_service.index_codebase(request)
         assert first_result.status == "success"
+
+        # Small delay to ensure mtime difference
+        import time
+        time.sleep(0.1)
 
         # Modify a file
         (temp_codebase / "test.py").write_text("""

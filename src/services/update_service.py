@@ -183,7 +183,7 @@ class IncrementalUpdateService:
             # If mtime is newer, verify with content hash
             content = file_path.read_text(encoding="utf-8", errors="ignore")
             current_hash = hashlib.sha256(content.encode()).hexdigest()
-
+            
             return current_hash != record.content_hash
 
         except Exception as e:
@@ -495,6 +495,9 @@ class IncrementalUpdateService:
         )
 
         self.file_records[file_path] = record
+        
+        # Persist to disk  
+        await self._persist_file_records()
 
     def get_affected_files(self, changed_file: str) -> list[str]:
         """Get files that depend on the changed file."""
@@ -517,3 +520,32 @@ class IncrementalUpdateService:
         except Exception as e:
             logger.warning(f"Error calculating hash for {file_path}: {e}")
             return ""
+
+    async def store_file_record(self, record: FileUpdateRecord) -> None:
+        """Store a file record for change tracking."""
+        self.file_records[record.file_path] = record
+        await self._persist_file_records()
+
+    async def _persist_file_records(self) -> None:
+        """Persist all file records to disk."""
+        metadata_file = self.config.INDEX_CACHE_DIR / "file_records.json"
+        metadata_file.parent.mkdir(parents=True, exist_ok=True)
+        
+        try:
+            import json
+            # Save all current in-memory records (don't merge with disk)
+            save_data = {}
+            for file_path, file_record in self.file_records.items():
+                save_data[file_path] = {
+                    "file_path": file_record.file_path,
+                    "content_hash": file_record.content_hash,
+                    "last_indexed": file_record.last_indexed.isoformat(),
+                    "chunk_ids": file_record.chunk_ids,
+                    "dependencies": file_record.dependencies,
+                }
+            
+            with open(metadata_file, "w") as f:
+                json.dump(save_data, f, indent=2)
+                
+        except Exception as e:
+            logger.warning(f"Failed to persist file records: {e}")
