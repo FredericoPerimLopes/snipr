@@ -54,7 +54,7 @@ class SearchService:
             # Run database migration first
             migration = DatabaseMigration()
             import asyncio
-            
+
             # Properly handle async migration in sync context
             try:
                 # Try to get the running loop
