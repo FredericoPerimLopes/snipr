@@ -708,59 +708,18 @@ class IndexingService:
 
     async def get_changed_files(self, codebase_path: str) -> tuple[list[Path], list[Path], list[Path]]:
         """Detect which files have changed, been added, or deleted.
+        
+        Delegates to update_service for enhanced change detection.
 
         Returns:
             Tuple of (modified_files, new_files, deleted_files)
         """
-        metadata_path = self.config.INDEX_CACHE_DIR / "index_metadata.json"
-
-        # Get current source files
-        codebase_path_obj = Path(codebase_path)
-        current_files = await self._discover_source_files(codebase_path_obj, None, self.config.DEFAULT_EXCLUDE_PATTERNS)
-
-        if not metadata_path.exists():
-            # No previous index - all files are new
-            return [], current_files, []
-
-        try:
-            with open(metadata_path) as f:
-                metadata = json.load(f)
-
-            stored_hashes = metadata.get("file_hashes", {})
-            stored_files = set(stored_hashes.keys())
-            current_file_strs = {str(f) for f in current_files}
-
-            modified_files = []
-            new_files = []
-            deleted_files = []
-
-            # Check for modified and new files
-            for file_path in current_files:
-                file_path_str = str(file_path)
-
-                if file_path_str in stored_hashes:
-                    # File was tracked - check if modified
-                    try:
-                        content = file_path.read_text(encoding="utf-8", errors="ignore")
-                        current_hash = hashlib.sha256(content.encode()).hexdigest()
-
-                        if current_hash != stored_hashes[file_path_str]:
-                            modified_files.append(file_path)
-                    except Exception:
-                        # Error reading - treat as modified
-                        modified_files.append(file_path)
-                else:
-                    # New file
-                    new_files.append(file_path)
-
-            # Check for deleted files
-            for stored_file_str in stored_files:
-                if stored_file_str not in current_file_strs:
-                    deleted_files.append(Path(stored_file_str))
-
-            return modified_files, new_files, deleted_files
-
-        except Exception as e:
-            logger.error(f"Error detecting changed files: {e}")
-            # On error, treat all current files as new
-            return [], current_files, []
+        # Delegate to enhanced update service
+        modified_strs, new_strs, deleted_strs = await self.update_service.detect_changes(codebase_path)
+        
+        # Convert strings back to Path objects for backward compatibility
+        modified_files = [Path(f) for f in modified_strs]
+        new_files = [Path(f) for f in new_strs]
+        deleted_files = [Path(f) for f in deleted_strs]
+        
+        return modified_files, new_files, deleted_files
