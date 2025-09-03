@@ -369,12 +369,16 @@ class IncrementalUpdateService:
         # Use config exclude patterns
         exclude_patterns = self.config.DEFAULT_EXCLUDE_PATTERNS
 
-        for root, dirs, files in codebase_path.rglob("*"):
+        import os
+        
+        for root, dirs, files in os.walk(codebase_path):
+            root_path = Path(root)
+            
             # Filter out excluded directories
-            dirs[:] = [d for d in dirs if not self._should_exclude_path(root / d, exclude_patterns)]
+            dirs[:] = [d for d in dirs if not self._should_exclude_path(root_path / d, exclude_patterns)]
 
             for file in files:
-                file_path = root / file
+                file_path = root_path / file
 
                 if (
                     self._is_source_file(str(file_path))

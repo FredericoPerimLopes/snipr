@@ -126,7 +126,7 @@ class IndexingService:
         # Use enhanced change detection
         modified_files, new_files, deleted_files = await self.update_service.detect_changes(str(codebase_path))
 
-        files_to_process = modified_files + new_files
+        files_to_process = [Path(f) for f in modified_files + new_files]
         total_changed_files = len(files_to_process) + len(deleted_files)
 
         if total_changed_files == 0:
@@ -153,7 +153,7 @@ class IndexingService:
         search_service = SearchService()
 
         # Clean up deleted and modified files from database
-        files_to_remove = [str(f) for f in deleted_files + modified_files]
+        files_to_remove = deleted_files + modified_files
         if files_to_remove:
             await search_service.remove_file_embeddings(files_to_remove)
 
@@ -178,9 +178,10 @@ class IndexingService:
 
             # Update file records for processed files
             for file_path in files_to_process:
-                file_chunks = [c for c in embedded_chunks if c.file_path == file_path]
+                file_path_str = str(file_path)
+                file_chunks = [c for c in embedded_chunks if c.file_path == file_path_str]
                 chunk_ids = [f"{c.file_path}:{c.start_line}" for c in file_chunks]
-                content_hash = self.update_service.calculate_file_hash(file_path)
+                content_hash = self.update_service.calculate_file_hash(file_path_str)
                 dependencies = []
 
                 # Extract dependencies from chunks
@@ -189,14 +190,15 @@ class IndexingService:
                         dependencies.extend(chunk.dependencies)
 
                 await self.update_service.update_file_record(
-                    file_path, content_hash, chunk_ids, list(set(dependencies))
+                    file_path_str, content_hash, chunk_ids, list(set(dependencies))
                 )
 
         # Build dependency graph for future incremental updates
         await self.update_service.build_dependency_graph(str(codebase_path))
 
         # Update index metadata with new file hashes
-        await self._update_index_metadata(codebase_path, files_to_process, deleted_files)
+        deleted_files_paths = [Path(f) for f in deleted_files]
+        await self._update_index_metadata(codebase_path, files_to_process, deleted_files_paths)
 
         processing_time = (time.time() - start_time) * 1000
 
