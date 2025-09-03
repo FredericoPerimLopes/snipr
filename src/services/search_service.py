@@ -16,6 +16,7 @@ from ..config import get_settings
 from ..models.indexing_models import CodeChunk, SearchRequest, SearchResponse
 from .bm25_search import BM25SearchEngine
 from .db_migration import DatabaseMigration
+from .vector_extension import VectorExtensionLoader, VectorOperations
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,19 @@ class SearchService:
     def __init__(self):
         self.config = get_settings()
         self.model: SentenceTransformer | None = None
-        self.db_path = self.config.VECTOR_DB_PATH
+        
+        # Initialize db paths based on configuration
+        if self.config.USE_SQLITE_VEC:
+            self.db_path = self.config.VEC_DB_PATH
+            self.vec_enabled = True
+            self.vec_loader = VectorExtensionLoader()
+            self.vec_ops = VectorOperations()
+        else:
+            self.db_path = self.config.VECTOR_DB_PATH
+            self.vec_enabled = False
+            self.vec_loader = None
+            self.vec_ops = None
+        
         self.bm25_engine = BM25SearchEngine()
         self._init_embedding_model()
         self._init_vector_db()
@@ -51,72 +64,101 @@ class SearchService:
             # Create cache directory if it doesn't exist
             self.config.INDEX_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
-            # Run database migration first
-            migration = DatabaseMigration()
-            import asyncio
+            if self.vec_enabled:
+                # Initialize with sqlite-vec extension
+                conn = sqlite3.connect(str(self.db_path))
+                
+                # Load the sqlite-vec extension
+                if self.vec_loader.load_extension(conn):
+                    logger.info("Successfully loaded sqlite-vec extension")
+                    
+                    # Create vec0 tables
+                    if self.vec_loader.create_vec_table(
+                        conn,
+                        "embeddings_vec",
+                        self.config.VEC_DIMENSION,
+                        self.config.VEC_INDEX_TYPE
+                    ):
+                        logger.info("Successfully created vec0 tables")
+                    
+                    # Test vec operations
+                    if self.vec_loader.test_vec_operations(conn):
+                        logger.info("Vec operations test passed")
+                    
+                    # Get vec info
+                    info = self.vec_loader.get_vec_info(conn)
+                    if info:
+                        logger.info(f"Vec info: {info}")
+                else:
+                    logger.warning("Failed to load sqlite-vec extension, falling back to legacy mode")
+                    self.vec_enabled = False
+                
+                conn.close()
+            
+            # Also initialize legacy database for dual-system support
+            if not self.vec_enabled or self.config.USE_SQLITE_VEC:
+                # Run database migration first
+                migration = DatabaseMigration()
+                import asyncio
+                
+                # Properly handle async migration in sync context
+                try:
+                    # Try to get the running loop
+                    loop = asyncio.get_running_loop()
+                    # Schedule the migration as a task (fire and forget)
+                    asyncio.create_task(migration.migrate_to_metadata_schema())
+                except RuntimeError:
+                    # No running loop, run synchronously
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    loop.run_until_complete(migration.migrate_to_metadata_schema())
 
-            # Properly handle async migration in sync context
-            try:
-                # Try to get the running loop
-                loop = asyncio.get_running_loop()
-                # Schedule the migration as a task (fire and forget)
-                asyncio.create_task(migration.migrate_to_metadata_schema())
-            except RuntimeError:
-                # No running loop, run synchronously
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                loop.run_until_complete(migration.migrate_to_metadata_schema())
+                # Initialize legacy SQLite database
+                legacy_conn = sqlite3.connect(str(self.config.VECTOR_DB_PATH))
 
-            # Initialize SQLite database with vector extension
-            conn = sqlite3.connect(str(self.db_path))
+                # Create embeddings table with metadata fields
+                legacy_conn.execute("""
+                    CREATE TABLE IF NOT EXISTS embeddings (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        file_path TEXT NOT NULL,
+                        content TEXT NOT NULL,
+                        start_line INTEGER NOT NULL,
+                        end_line INTEGER NOT NULL,
+                        language TEXT NOT NULL,
+                        semantic_type TEXT NOT NULL,
+                        embedding BLOB,
+                        content_hash TEXT NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        function_signature TEXT,
+                        class_name TEXT,
+                        function_name TEXT,
+                        parameter_types TEXT,
+                        return_type TEXT,
+                        inheritance_chain TEXT,
+                        import_statements TEXT,
+                        docstring TEXT,
+                        complexity_score INTEGER,
+                        dependencies TEXT,
+                        interfaces TEXT,
+                        decorators TEXT,
+                        UNIQUE(file_path, start_line, end_line)
+                    )
+                """)
 
-            # Create embeddings table with metadata fields
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS embeddings (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    file_path TEXT NOT NULL,
-                    content TEXT NOT NULL,
-                    start_line INTEGER NOT NULL,
-                    end_line INTEGER NOT NULL,
-                    language TEXT NOT NULL,
-                    semantic_type TEXT NOT NULL,
-                    embedding BLOB,
-                    content_hash TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    function_signature TEXT,
-                    class_name TEXT,
-                    function_name TEXT,
-                    parameter_types TEXT,
-                    return_type TEXT,
-                    inheritance_chain TEXT,
-                    import_statements TEXT,
-                    docstring TEXT,
-                    complexity_score INTEGER,
-                    dependencies TEXT,
-                    interfaces TEXT,
-                    decorators TEXT,
-                    UNIQUE(file_path, start_line, end_line)
-                )
-            """)
+                # Create indexes for performance
+                legacy_conn.execute("CREATE INDEX IF NOT EXISTS idx_language ON embeddings(language)")
+                legacy_conn.execute("CREATE INDEX IF NOT EXISTS idx_semantic_type ON embeddings(semantic_type)")
+                legacy_conn.execute("CREATE INDEX IF NOT EXISTS idx_file_path ON embeddings(file_path)")
+                legacy_conn.execute("CREATE INDEX IF NOT EXISTS idx_content_hash ON embeddings(content_hash)")
+                legacy_conn.execute("CREATE INDEX IF NOT EXISTS idx_function_name ON embeddings(function_name)")
+                legacy_conn.execute("CREATE INDEX IF NOT EXISTS idx_class_name ON embeddings(class_name)")
+                legacy_conn.execute("CREATE INDEX IF NOT EXISTS idx_complexity ON embeddings(complexity_score)")
+                legacy_conn.execute("CREATE INDEX IF NOT EXISTS idx_return_type ON embeddings(return_type)")
 
-            # Create indexes for performance
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_language ON embeddings(language)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_semantic_type ON embeddings(semantic_type)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_file_path ON embeddings(file_path)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_content_hash ON embeddings(content_hash)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_function_name ON embeddings(function_name)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_class_name ON embeddings(class_name)")
+                legacy_conn.commit()
+                legacy_conn.close()
 
-            # Create metadata indexes
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_function_name ON embeddings(function_name)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_class_name ON embeddings(class_name)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_complexity ON embeddings(complexity_score)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_return_type ON embeddings(return_type)")
-
-            conn.commit()
-            conn.close()
-
-            logger.info(f"Initialized vector database at {self.db_path}")
+                logger.info(f"Initialized legacy database at {self.config.VECTOR_DB_PATH}")
 
         except Exception as e:
             logger.error(f"Failed to initialize vector database: {e}")

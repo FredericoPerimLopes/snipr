@@ -16,6 +16,7 @@ dependencies = [
     "llama-index-core>=0.10.0",
     "tree-sitter-language-pack>=0.1.0",
     "sentence-transformers>=2.2.0",
+    "sqlite-vec>=0.1.6",
 ]
 
 [project.optional-dependencies]
