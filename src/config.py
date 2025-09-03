@@ -46,6 +46,16 @@ class Config:
     ENABLE_QUANTIZATION: bool = _quantization_env == "true"
     BATCH_SIZE: int = int(os.getenv("BATCH_SIZE", "100"))
 
+    # Incremental update configuration
+    ENABLE_INCREMENTAL_UPDATES: bool = os.getenv("ENABLE_INCREMENTAL_UPDATES", "true").lower() == "true"
+    AUTO_SYNC_ON_SEARCH: bool = os.getenv("AUTO_SYNC_ON_SEARCH", "true").lower() == "true"
+    MAX_FILES_PER_BATCH: int = int(os.getenv("MAX_FILES_PER_BATCH", "100"))
+    DEPENDENCY_GRAPH_ENABLED: bool = os.getenv("DEPENDENCY_GRAPH_ENABLED", "true").lower() == "true"
+    
+    # Memory management
+    MAX_MEMORY_MB: int = int(os.getenv("MAX_MEMORY_MB", "4096"))
+    CHUNK_CACHE_SIZE: int = int(os.getenv("CHUNK_CACHE_SIZE", "10000"))
+
     # Exclude patterns for indexing
     DEFAULT_EXCLUDE_PATTERNS: ClassVar[list[str]] = [
         "**/.git/**",

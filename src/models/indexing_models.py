@@ -1,3 +1,7 @@
+from datetime import datetime
+from enum import Enum
+from typing import Optional
+
 from pydantic import BaseModel, Field
 
 
@@ -14,6 +18,17 @@ class SearchRequest(BaseModel):
     similarity_threshold: float = Field(default=0.7, ge=0.0, le=1.0)
 
 
+class ChunkType(Enum):
+    """Semantic types for code chunks."""
+    FILE = "file"
+    CLASS = "class"
+    FUNCTION = "function"
+    METHOD = "method"
+    IMPORT_BLOCK = "import_block"
+    VARIABLE = "variable"
+    CODE_BLOCK = "code_block"
+
+
 class CodeChunk(BaseModel):
     file_path: str
     content: str
@@ -22,6 +37,15 @@ class CodeChunk(BaseModel):
     language: str
     semantic_type: str  # function, class, variable, etc.
     embedding: list[float] | None = None
+
+    # Enhanced scalability fields
+    chunk_type: ChunkType | None = None
+    parent_chunk_id: str | None = None
+    dependencies: list[str] | None = None
+    dependents: list[str] | None = None
+    complexity_score: float | None = None
+    last_modified: datetime | None = None
+    file_hash: str | None = None
 
     # Rich metadata fields
     function_signature: str | None = None
@@ -32,8 +56,6 @@ class CodeChunk(BaseModel):
     inheritance_chain: list[str] | None = None
     import_statements: list[str] | None = None
     docstring: str | None = None
-    complexity_score: int | None = None
-    dependencies: list[str] | None = None
     interfaces: list[str] | None = None
     decorators: list[str] | None = None
 
@@ -50,6 +72,23 @@ class IndexingResponse(BaseModel):
     processing_time_ms: float
     languages_detected: list[str]
     status: str = "success"
+
+
+class FileUpdateRecord(BaseModel):
+    """Track file state for incremental updates."""
+    file_path: str
+    content_hash: str
+    last_indexed: datetime
+    chunk_ids: list[str]
+    dependencies: list[str]
+
+
+class IndexUpdateResult(BaseModel):
+    """Result of incremental update operation."""
+    updated_chunks: list[str]
+    deleted_chunks: list[str]
+    affected_files: list[str]
+    processing_time: float
 
 
 class IndexingStatus(BaseModel):

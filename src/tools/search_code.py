@@ -16,20 +16,38 @@ hybrid_search_service = HybridSearchService(search_service, metadata_search_engi
 
 
 async def search_code(
-    query: str, language: str | None = None, max_results: int = 10, similarity_threshold: float = 0.7
+    query: str, 
+    language: str | None = None, 
+    max_results: int = 10, 
+    similarity_threshold: float = 0.7,
+    codebase_path: str | None = None,
+    auto_sync: bool = True
 ) -> str:
-    """Search for semantically similar code chunks.
+    """Search for semantically similar code chunks with automatic index syncing.
 
     Args:
         query: Natural language or code query to search for
         language: Filter results by programming language (optional)
         max_results: Maximum number of results to return (1-100)
         similarity_threshold: Minimum similarity score (0.0-1.0)
+        codebase_path: Path to codebase for auto-sync (optional)
+        auto_sync: Whether to check for changes before searching (default: True)
 
     Returns:
         JSON string with search results and metadata
     """
     try:
+        # Auto-sync index if requested and codebase path provided
+        if auto_sync and codebase_path:
+            from ..services.indexing_service import IndexingService
+            from ..models.indexing_models import IndexingRequest
+            
+            indexing_service = IndexingService()
+            if await indexing_service.update_service.should_update_index(codebase_path):
+                logger.info("Changes detected, syncing index before search...")
+                sync_request = IndexingRequest(codebase_path=codebase_path)
+                await indexing_service.index_codebase(sync_request)
+        
         # Validate and create search request
         request = SearchRequest(
             query=query,

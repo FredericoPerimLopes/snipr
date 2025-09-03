@@ -45,13 +45,16 @@ except ImportError:
 
 from ..config import get_settings, validate_codebase_path
 from ..models.indexing_models import (
+    ChunkType,
     CodeChunk,
     IndexingRequest,
     IndexingResponse,
     IndexingStatus,
+    IndexUpdateResult,
 )
 from .metadata_extractor import MetadataExtractor
 from .syntactic_chunker import SyntacticChunker
+from .update_service import IncrementalUpdateService
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +67,7 @@ class IndexingService:
         self.code_splitters: dict[str, CodeSplitter] = {}
         self.metadata_extractor = MetadataExtractor()
         self.syntactic_chunker = SyntacticChunker()
+        self.update_service = IncrementalUpdateService()
         self._init_parsers()
         self._init_code_splitters()
 
@@ -115,14 +119,14 @@ class IndexingService:
                 logger.warning(f"Failed to initialize {lang_name} CodeSplitter: {e}")
 
     async def index_codebase(self, request: IndexingRequest) -> IndexingResponse:
-        """Index codebase with incremental updates for changed files only."""
+        """Index codebase with smart incremental updates using git-aware change detection."""
         start_time = time.time()
 
         # Validate codebase path
         codebase_path = validate_codebase_path(request.codebase_path)
 
-        # Check for incremental vs full indexing
-        modified_files, new_files, deleted_files = await self.get_changed_files(str(codebase_path))
+        # Use enhanced change detection
+        modified_files, new_files, deleted_files = await self.update_service.detect_changes(str(codebase_path))
 
         files_to_process = modified_files + new_files
         total_changed_files = len(files_to_process) + len(deleted_files)
@@ -173,6 +177,25 @@ class IndexingService:
             logger.info(f"Generating embeddings for {len(all_chunks)} chunks...")
             embedded_chunks = await search_service.embed_code_chunks(all_chunks)
             logger.info(f"Successfully generated embeddings for {len(embedded_chunks)} chunks")
+            
+            # Update file records for processed files
+            for file_path in files_to_process:
+                file_chunks = [c for c in embedded_chunks if c.file_path == file_path]
+                chunk_ids = [f"{c.file_path}:{c.start_line}" for c in file_chunks]
+                content_hash = self.update_service.calculate_file_hash(file_path)
+                dependencies = []
+                
+                # Extract dependencies from chunks
+                for chunk in file_chunks:
+                    if chunk.dependencies:
+                        dependencies.extend(chunk.dependencies)
+                
+                await self.update_service.update_file_record(
+                    file_path, content_hash, chunk_ids, list(set(dependencies))
+                )
+
+        # Build dependency graph for future incremental updates
+        await self.update_service.build_dependency_graph(str(codebase_path))
 
         # Update index metadata with new file hashes
         await self._update_index_metadata(codebase_path, files_to_process, deleted_files)
