@@ -241,6 +241,7 @@ class TestIndexingService:
 
         # Reinitialize update service to ensure clean state
         from ...services.update_service import IncrementalUpdateService
+
         indexing_service.update_service = IncrementalUpdateService()
 
         modified, new, deleted = await indexing_service.get_changed_files(str(temp_codebase))
@@ -309,6 +310,7 @@ class TestIndexingService:
 
         # Reinitialize update service to ensure clean state
         from ...services.update_service import IncrementalUpdateService
+
         indexing_service.update_service = IncrementalUpdateService()
 
         # First index
