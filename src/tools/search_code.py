@@ -16,9 +16,9 @@ hybrid_search_service = HybridSearchService(search_service, metadata_search_engi
 
 
 async def search_code(
-    query: str, 
-    language: str | None = None, 
-    max_results: int = 10, 
+    query: str,
+    language: str | None = None,
+    max_results: int = 10,
     similarity_threshold: float = 0.7,
     codebase_path: str | None = None,
     auto_sync: bool = True
@@ -39,15 +39,15 @@ async def search_code(
     try:
         # Auto-sync index if requested and codebase path provided
         if auto_sync and codebase_path:
-            from ..services.indexing_service import IndexingService
             from ..models.indexing_models import IndexingRequest
-            
+            from ..services.indexing_service import IndexingService
+
             indexing_service = IndexingService()
             if await indexing_service.update_service.should_update_index(codebase_path):
                 logger.info("Changes detected, syncing index before search...")
                 sync_request = IndexingRequest(codebase_path=codebase_path)
                 await indexing_service.index_codebase(sync_request)
-        
+
         # Validate and create search request
         request = SearchRequest(
             query=query,

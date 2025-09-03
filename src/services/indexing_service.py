@@ -177,19 +177,19 @@ class IndexingService:
             logger.info(f"Generating embeddings for {len(all_chunks)} chunks...")
             embedded_chunks = await search_service.embed_code_chunks(all_chunks)
             logger.info(f"Successfully generated embeddings for {len(embedded_chunks)} chunks")
-            
+
             # Update file records for processed files
             for file_path in files_to_process:
                 file_chunks = [c for c in embedded_chunks if c.file_path == file_path]
                 chunk_ids = [f"{c.file_path}:{c.start_line}" for c in file_chunks]
                 content_hash = self.update_service.calculate_file_hash(file_path)
                 dependencies = []
-                
+
                 # Extract dependencies from chunks
                 for chunk in file_chunks:
                     if chunk.dependencies:
                         dependencies.extend(chunk.dependencies)
-                
+
                 await self.update_service.update_file_record(
                     file_path, content_hash, chunk_ids, list(set(dependencies))
                 )

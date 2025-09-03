@@ -51,7 +51,7 @@ class Config:
     AUTO_SYNC_ON_SEARCH: bool = os.getenv("AUTO_SYNC_ON_SEARCH", "true").lower() == "true"
     MAX_FILES_PER_BATCH: int = int(os.getenv("MAX_FILES_PER_BATCH", "100"))
     DEPENDENCY_GRAPH_ENABLED: bool = os.getenv("DEPENDENCY_GRAPH_ENABLED", "true").lower() == "true"
-    
+
     # Memory management
     MAX_MEMORY_MB: int = int(os.getenv("MAX_MEMORY_MB", "4096"))
     CHUNK_CACHE_SIZE: int = int(os.getenv("CHUNK_CACHE_SIZE", "10000"))
