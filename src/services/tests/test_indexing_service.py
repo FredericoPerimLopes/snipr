@@ -58,7 +58,7 @@ class Counter {
     shutil.rmtree(temp_dir)
 
 
-@pytest.fixture  
+@pytest.fixture
 def mock_config():
     """Mock configuration for testing."""
     with patch("src.services.indexing_service.get_settings") as mock_indexing_settings, \
@@ -247,7 +247,7 @@ class TestIndexingService:
         file_records_path = mock_config.INDEX_CACHE_DIR / "file_records.json"
         if file_records_path.exists():
             file_records_path.unlink()
-            
+
         # Also clear the update service's in-memory records
         indexing_service.update_service.file_records.clear()
 
@@ -290,11 +290,11 @@ class TestIndexingService:
         metadata_path = indexing_service.config.INDEX_CACHE_DIR / "index_metadata.json"
         if metadata_path.exists():
             metadata_path.unlink()
-            
+
         file_records_path = mock_config.INDEX_CACHE_DIR / "file_records.json"
         if file_records_path.exists():
             file_records_path.unlink()
-            
+
         # Also clear the update service's in-memory records
         indexing_service.update_service.file_records.clear()
 
@@ -319,11 +319,11 @@ class TestIndexingService:
         metadata_path = indexing_service.config.INDEX_CACHE_DIR / "index_metadata.json"
         if metadata_path.exists():
             metadata_path.unlink()
-            
+
         file_records_path = mock_config.INDEX_CACHE_DIR / "file_records.json"
         if file_records_path.exists():
             file_records_path.unlink()
-            
+
         # Also clear the update service's in-memory records
         indexing_service.update_service.file_records.clear()
 

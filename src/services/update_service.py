@@ -96,7 +96,7 @@ class IncrementalUpdateService:
                 # Each can be space, M, A, D, R, C, U, ?, !
                 if len(line) < 3:
                     continue
-                    
+
                 status = line[:2]  # First two characters are status
                 file_path = line[2:].strip()  # Rest is filename, strip any leading space
 
@@ -150,7 +150,7 @@ class IncrementalUpdateService:
         current_files = await self._discover_source_files(codebase_path)
         current_file_set = {str(f) for f in current_files}
         stored_file_set = set(self.file_records.keys())
-        
+
 
         modified_files = []
         new_files = []
@@ -183,7 +183,7 @@ class IncrementalUpdateService:
             # If mtime is newer, verify with content hash
             content = file_path.read_text(encoding="utf-8", errors="ignore")
             current_hash = hashlib.sha256(content.encode()).hexdigest()
-            
+
             return current_hash != record.content_hash
 
         except Exception as e:
@@ -495,8 +495,8 @@ class IncrementalUpdateService:
         )
 
         self.file_records[file_path] = record
-        
-        # Persist to disk  
+
+        # Persist to disk
         await self._persist_file_records()
 
     def get_affected_files(self, changed_file: str) -> list[str]:
@@ -530,7 +530,7 @@ class IncrementalUpdateService:
         """Persist all file records to disk."""
         metadata_file = self.config.INDEX_CACHE_DIR / "file_records.json"
         metadata_file.parent.mkdir(parents=True, exist_ok=True)
-        
+
         try:
             import json
             # Save all current in-memory records (don't merge with disk)
@@ -543,9 +543,9 @@ class IncrementalUpdateService:
                     "chunk_ids": file_record.chunk_ids,
                     "dependencies": file_record.dependencies,
                 }
-            
+
             with open(metadata_file, "w") as f:
                 json.dump(save_data, f, indent=2)
-                
+
         except Exception as e:
             logger.warning(f"Failed to persist file records: {e}")

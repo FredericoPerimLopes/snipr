@@ -52,3 +52,4 @@ Thumbs.db
 temp/
 tmp/
 .mypy_cache/
+<Mock name='get_settings().VECTOR_DB_PATH' id='128511583712784'>

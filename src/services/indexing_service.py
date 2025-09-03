@@ -604,7 +604,6 @@ class IndexingService:
         metadata_path = self.config.INDEX_CACHE_DIR / "index_metadata.json"
         with open(metadata_path, "w") as f:
             json.dump(metadata, f, indent=2)
-            
         # Also update the update service file records for proper change detection
         from datetime import datetime
         for chunk in chunks:
@@ -613,9 +612,8 @@ class IndexingService:
                 file_hash = metadata["file_hashes"].get(str(file_path))
                 if file_hash:
                     # Generate chunk IDs for the file
-                    file_chunk_ids = [f"{file_path.name}:{chunk.start_line}-{chunk.end_line}" 
+                    file_chunk_ids = [f"{file_path.name}:{chunk.start_line}-{chunk.end_line}"
                                       for chunk in chunks if chunk.file_path == str(file_path)]
-                    
                     record = FileUpdateRecord(
                         file_path=str(file_path),
                         content_hash=file_hash,
