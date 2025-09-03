@@ -46,12 +46,14 @@ except ImportError:
 from ..config import get_settings, validate_codebase_path
 from ..models.indexing_models import (
     CodeChunk,
+    FileUpdateRecord,
     IndexingRequest,
     IndexingResponse,
     IndexingStatus,
 )
 from .metadata_extractor import MetadataExtractor
 from .syntactic_chunker import SyntacticChunker
+from .update_service import IncrementalUpdateService
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +66,7 @@ class IndexingService:
         self.code_splitters: dict[str, CodeSplitter] = {}
         self.metadata_extractor = MetadataExtractor()
         self.syntactic_chunker = SyntacticChunker()
+        self.update_service = IncrementalUpdateService()
         self._init_parsers()
         self._init_code_splitters()
 
@@ -115,16 +118,16 @@ class IndexingService:
                 logger.warning(f"Failed to initialize {lang_name} CodeSplitter: {e}")
 
     async def index_codebase(self, request: IndexingRequest) -> IndexingResponse:
-        """Index codebase with incremental updates for changed files only."""
+        """Index codebase with smart incremental updates using git-aware change detection."""
         start_time = time.time()
 
         # Validate codebase path
         codebase_path = validate_codebase_path(request.codebase_path)
 
-        # Check for incremental vs full indexing
-        modified_files, new_files, deleted_files = await self.get_changed_files(str(codebase_path))
+        # Use enhanced change detection
+        modified_files, new_files, deleted_files = await self.update_service.detect_changes(str(codebase_path))
 
-        files_to_process = modified_files + new_files
+        files_to_process = [Path(f) for f in modified_files + new_files]
         total_changed_files = len(files_to_process) + len(deleted_files)
 
         if total_changed_files == 0:
@@ -151,7 +154,7 @@ class IndexingService:
         search_service = SearchService()
 
         # Clean up deleted and modified files from database
-        files_to_remove = [str(f) for f in deleted_files + modified_files]
+        files_to_remove = deleted_files + modified_files
         if files_to_remove:
             await search_service.remove_file_embeddings(files_to_remove)
 
@@ -174,8 +177,29 @@ class IndexingService:
             embedded_chunks = await search_service.embed_code_chunks(all_chunks)
             logger.info(f"Successfully generated embeddings for {len(embedded_chunks)} chunks")
 
+            # Update file records for processed files
+            for file_path in files_to_process:
+                file_path_str = str(file_path)
+                file_chunks = [c for c in embedded_chunks if c.file_path == file_path_str]
+                chunk_ids = [f"{c.file_path}:{c.start_line}" for c in file_chunks]
+                content_hash = self.update_service.calculate_file_hash(file_path_str)
+                dependencies = []
+
+                # Extract dependencies from chunks
+                for chunk in file_chunks:
+                    if chunk.dependencies:
+                        dependencies.extend(chunk.dependencies)
+
+                await self.update_service.update_file_record(
+                    file_path_str, content_hash, chunk_ids, list(set(dependencies))
+                )
+
+        # Build dependency graph for future incremental updates
+        await self.update_service.build_dependency_graph(str(codebase_path))
+
         # Update index metadata with new file hashes
-        await self._update_index_metadata(codebase_path, files_to_process, deleted_files)
+        deleted_files_paths = [Path(f) for f in deleted_files]
+        await self._update_index_metadata(codebase_path, files_to_process, deleted_files_paths)
 
         processing_time = (time.time() - start_time) * 1000
 
@@ -580,6 +604,28 @@ class IndexingService:
         metadata_path = self.config.INDEX_CACHE_DIR / "index_metadata.json"
         with open(metadata_path, "w") as f:
             json.dump(metadata, f, indent=2)
+        # Also update the update service file records for proper change detection
+        from datetime import datetime
+
+        for chunk in chunks:
+            file_path = Path(chunk.file_path)
+            if file_path.exists():
+                file_hash = metadata["file_hashes"].get(str(file_path))
+                if file_hash:
+                    # Generate chunk IDs for the file
+                    file_chunk_ids = [
+                        f"{file_path.name}:{chunk.start_line}-{chunk.end_line}"
+                        for chunk in chunks
+                        if chunk.file_path == str(file_path)
+                    ]
+                    record = FileUpdateRecord(
+                        file_path=str(file_path),
+                        content_hash=file_hash,
+                        last_indexed=datetime.now(),
+                        chunk_ids=file_chunk_ids,
+                        dependencies=[],  # Will be populated by dependency analysis
+                    )
+                    await self.update_service.store_file_record(record)
 
     async def _update_index_metadata(
         self, codebase_path: Path, updated_files: list[Path], deleted_files: list[Path]
@@ -686,58 +732,17 @@ class IndexingService:
     async def get_changed_files(self, codebase_path: str) -> tuple[list[Path], list[Path], list[Path]]:
         """Detect which files have changed, been added, or deleted.
 
+        Delegates to update_service for enhanced change detection.
+
         Returns:
             Tuple of (modified_files, new_files, deleted_files)
         """
-        metadata_path = self.config.INDEX_CACHE_DIR / "index_metadata.json"
+        # Delegate to enhanced update service
+        modified_strs, new_strs, deleted_strs = await self.update_service.detect_changes(codebase_path)
 
-        # Get current source files
-        codebase_path_obj = Path(codebase_path)
-        current_files = await self._discover_source_files(codebase_path_obj, None, self.config.DEFAULT_EXCLUDE_PATTERNS)
+        # Convert strings back to Path objects for backward compatibility
+        modified_files = [Path(f) for f in modified_strs]
+        new_files = [Path(f) for f in new_strs]
+        deleted_files = [Path(f) for f in deleted_strs]
 
-        if not metadata_path.exists():
-            # No previous index - all files are new
-            return [], current_files, []
-
-        try:
-            with open(metadata_path) as f:
-                metadata = json.load(f)
-
-            stored_hashes = metadata.get("file_hashes", {})
-            stored_files = set(stored_hashes.keys())
-            current_file_strs = {str(f) for f in current_files}
-
-            modified_files = []
-            new_files = []
-            deleted_files = []
-
-            # Check for modified and new files
-            for file_path in current_files:
-                file_path_str = str(file_path)
-
-                if file_path_str in stored_hashes:
-                    # File was tracked - check if modified
-                    try:
-                        content = file_path.read_text(encoding="utf-8", errors="ignore")
-                        current_hash = hashlib.sha256(content.encode()).hexdigest()
-
-                        if current_hash != stored_hashes[file_path_str]:
-                            modified_files.append(file_path)
-                    except Exception:
-                        # Error reading - treat as modified
-                        modified_files.append(file_path)
-                else:
-                    # New file
-                    new_files.append(file_path)
-
-            # Check for deleted files
-            for stored_file_str in stored_files:
-                if stored_file_str not in current_file_strs:
-                    deleted_files.append(Path(stored_file_str))
-
-            return modified_files, new_files, deleted_files
-
-        except Exception as e:
-            logger.error(f"Error detecting changed files: {e}")
-            # On error, treat all current files as new
-            return [], current_files, []
+        return modified_files, new_files, deleted_files
