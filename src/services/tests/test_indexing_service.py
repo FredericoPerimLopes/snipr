@@ -61,8 +61,10 @@ class Counter {
 @pytest.fixture
 def mock_config():
     """Mock configuration for testing."""
-    with patch("src.services.indexing_service.get_settings") as mock_indexing_settings, \
-         patch("src.services.update_service.get_settings") as mock_update_settings:
+    with (
+        patch("src.services.indexing_service.get_settings") as mock_indexing_settings,
+        patch("src.services.update_service.get_settings") as mock_update_settings,
+    ):
         config = Mock()
         config.INDEX_CACHE_DIR = Path(tempfile.mkdtemp())
         config.MAX_FILE_SIZE_MB = 10
@@ -266,6 +268,7 @@ class TestIndexingService:
 
         # Small delay to ensure mtime difference
         import time
+
         time.sleep(0.1)
 
         # Modify the test file
@@ -335,6 +338,7 @@ class TestIndexingService:
 
         # Small delay to ensure mtime difference
         import time
+
         time.sleep(0.1)
 
         # Modify a file

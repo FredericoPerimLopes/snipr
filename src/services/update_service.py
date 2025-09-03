@@ -151,7 +151,6 @@ class IncrementalUpdateService:
         current_file_set = {str(f) for f in current_files}
         stored_file_set = set(self.file_records.keys())
 
-
         modified_files = []
         new_files = []
         deleted_files = list(stored_file_set - current_file_set)
@@ -533,6 +532,7 @@ class IncrementalUpdateService:
 
         try:
             import json
+
             # Save all current in-memory records (don't merge with disk)
             save_data = {}
             for file_path, file_record in self.file_records.items():
