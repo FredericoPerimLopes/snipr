@@ -233,6 +233,15 @@ class TestIndexingService:
         metadata_path = indexing_service.config.INDEX_CACHE_DIR / "index_metadata.json"
         if metadata_path.exists():
             metadata_path.unlink()
+        
+        # Also clean up file records from update service
+        file_records_path = mock_config.INDEX_CACHE_DIR / "file_records.json"
+        if file_records_path.exists():
+            file_records_path.unlink()
+        
+        # Reinitialize update service to ensure clean state
+        from ...services.update_service import IncrementalUpdateService
+        indexing_service.update_service = IncrementalUpdateService()
 
         modified, new, deleted = await indexing_service.get_changed_files(str(temp_codebase))
 
@@ -298,8 +307,9 @@ class TestIndexingService:
         if file_records_path.exists():
             file_records_path.unlink()
 
-        # Also clear the update service's in-memory records
-        indexing_service.update_service.file_records.clear()
+        # Reinitialize update service to ensure clean state
+        from ...services.update_service import IncrementalUpdateService
+        indexing_service.update_service = IncrementalUpdateService()
 
         # First index
         request = IndexingRequest(codebase_path=str(temp_codebase), languages=None, exclude_patterns=None)
