@@ -54,8 +54,18 @@ class SearchService:
             # Run database migration first
             migration = DatabaseMigration()
             import asyncio
-
-            asyncio.create_task(migration.migrate_to_metadata_schema())
+            
+            # Properly handle async migration in sync context
+            try:
+                # Try to get the running loop
+                loop = asyncio.get_running_loop()
+                # Schedule the migration as a task (fire and forget)
+                asyncio.create_task(migration.migrate_to_metadata_schema())
+            except RuntimeError:
+                # No running loop, run synchronously
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                loop.run_until_complete(migration.migrate_to_metadata_schema())
 
             # Initialize SQLite database with vector extension
             conn = sqlite3.connect(str(self.db_path))
