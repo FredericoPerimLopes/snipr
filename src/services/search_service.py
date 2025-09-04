@@ -66,10 +66,7 @@ class SearchService:
 
                 # Create vec0 tables
                 if self.vec_loader.create_vec_table(
-                    conn,
-                    "embeddings_vec",
-                    self.config.VEC_DIMENSION,
-                    self.config.VEC_INDEX_TYPE
+                    conn, "embeddings_vec", self.config.VEC_DIMENSION, self.config.VEC_INDEX_TYPE
                 ):
                     logger.info("Successfully created vec0 tables")
 
@@ -310,11 +307,11 @@ class SearchService:
                 query_embedding.tolist(),
                 k=max_results,
                 distance_metric="cosine",
-                threshold=distance_threshold
+                threshold=distance_threshold,
             )
 
             chunks = []
-            for _rowid, distance, metadata in results:
+            for _rowid, _distance, metadata in results:
                 # Apply language filter if specified
                 if language_filter and metadata.get("language") != language_filter:
                     continue
@@ -559,7 +556,7 @@ class SearchService:
             conn.execute(
                 f"DELETE FROM embeddings_vec WHERE rowid IN "
                 f"(SELECT rowid FROM embeddings_vec_metadata WHERE file_path IN ({placeholders}))",
-                file_paths
+                file_paths,
             )
             conn.execute(f"DELETE FROM embeddings_vec_metadata WHERE file_path IN ({placeholders})", file_paths)
 

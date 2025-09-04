@@ -18,11 +18,11 @@ class VectorExtensionLoader:
     def load_extension(conn: sqlite3.Connection, check_loaded: bool = True) -> bool:
         """
         Load sqlite-vec extension into the SQLite connection.
-        
+
         Args:
             conn: SQLite database connection
             check_loaded: Whether to check if extension is already loaded
-            
+
         Returns:
             True if successfully loaded or already loaded, False otherwise
         """
@@ -61,20 +61,17 @@ class VectorExtensionLoader:
 
     @staticmethod
     def create_vec_table(
-        conn: sqlite3.Connection,
-        table_name: str = "embeddings_vec",
-        dimension: int = 768,
-        index_type: str = "flat"
+        conn: sqlite3.Connection, table_name: str = "embeddings_vec", dimension: int = 768, index_type: str = "flat"
     ) -> bool:
         """
         Create a vec0 virtual table for storing embeddings.
-        
+
         Args:
             conn: SQLite database connection
             table_name: Name of the vector table
             dimension: Dimension of vectors
             index_type: Type of index (flat, ivf, hnsw)
-            
+
         Returns:
             True if table created successfully, False otherwise
         """
@@ -122,8 +119,12 @@ class VectorExtensionLoader:
             # Create indexes on metadata table
             conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{metadata_table}_file_path ON {metadata_table}(file_path)")
             conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{metadata_table}_language ON {metadata_table}(language)")
-            conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{metadata_table}_semantic_type ON {metadata_table}(semantic_type)")
-            conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{metadata_table}_function_name ON {metadata_table}(function_name)")
+            conn.execute(
+                f"CREATE INDEX IF NOT EXISTS idx_{metadata_table}_semantic_type ON {metadata_table}(semantic_type)"
+            )
+            conn.execute(
+                f"CREATE INDEX IF NOT EXISTS idx_{metadata_table}_function_name ON {metadata_table}(function_name)"
+            )
             conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{metadata_table}_class_name ON {metadata_table}(class_name)")
 
             conn.commit()
@@ -138,10 +139,10 @@ class VectorExtensionLoader:
     def test_vec_operations(conn: sqlite3.Connection) -> bool:
         """
         Test basic vec operations to ensure extension is working.
-        
+
         Args:
             conn: SQLite database connection
-            
+
         Returns:
             True if all tests pass, False otherwise
         """
@@ -151,19 +152,23 @@ class VectorExtensionLoader:
 
             # Test 2: Insert test vectors (need to convert to bytes)
             import struct
-            vec1 = struct.pack('3f', 1.0, 2.0, 3.0)
-            vec2 = struct.pack('3f', 4.0, 5.0, 6.0)
+
+            vec1 = struct.pack("3f", 1.0, 2.0, 3.0)
+            vec2 = struct.pack("3f", 4.0, 5.0, 6.0)
             conn.execute("INSERT INTO test_vec(test_embedding) VALUES (?)", (vec1,))
             conn.execute("INSERT INTO test_vec(test_embedding) VALUES (?)", (vec2,))
 
             # Test 3: Query with distance function
-            query_vec = struct.pack('3f', 1.0, 2.0, 3.0)
-            cursor = conn.execute("""
+            query_vec = struct.pack("3f", 1.0, 2.0, 3.0)
+            cursor = conn.execute(
+                """
                 SELECT rowid, vec_distance_cosine(test_embedding, ?) as distance
                 FROM test_vec
                 ORDER BY distance
                 LIMIT 1
-            """, (query_vec,))
+            """,
+                (query_vec,),
+            )
 
             result = cursor.fetchone()
             if result:
@@ -183,10 +188,10 @@ class VectorExtensionLoader:
     def get_vec_info(conn: sqlite3.Connection) -> dict | None:
         """
         Get information about sqlite-vec extension and tables.
-        
+
         Args:
             conn: SQLite database connection
-            
+
         Returns:
             Dictionary with vec info or None if not available
         """
@@ -224,33 +229,28 @@ class VectorOperations:
 
     @staticmethod
     def insert_embedding(
-        conn: sqlite3.Connection,
-        table_name: str,
-        embedding: list[float],
-        metadata: dict
+        conn: sqlite3.Connection, table_name: str, embedding: list[float], metadata: dict
     ) -> int | None:
         """
         Insert an embedding with metadata.
-        
+
         Args:
             conn: SQLite database connection
             table_name: Name of the vec table
             embedding: The embedding vector
             metadata: Associated metadata
-            
+
         Returns:
             The rowid of the inserted record or None if failed
         """
         try:
             # Convert embedding to bytes format for sqlite-vec
             import struct
-            embedding_bytes = struct.pack(f'{len(embedding)}f', *embedding)
+
+            embedding_bytes = struct.pack(f"{len(embedding)}f", *embedding)
 
             # Insert embedding into vec table
-            cursor = conn.execute(
-                f"INSERT INTO {table_name}(embedding) VALUES (?)",
-                (embedding_bytes,)
-            )
+            cursor = conn.execute(f"INSERT INTO {table_name}(embedding) VALUES (?)", (embedding_bytes,))
             rowid = cursor.lastrowid
 
             # Insert metadata
@@ -262,8 +262,7 @@ class VectorOperations:
             columns_str = ",".join(columns)
 
             conn.execute(
-                f"INSERT INTO {metadata_table} ({columns_str}) VALUES ({placeholders})",
-                list(metadata.values())
+                f"INSERT INTO {metadata_table} ({columns_str}) VALUES ({placeholders})", list(metadata.values())
             )
 
             return rowid
@@ -279,11 +278,11 @@ class VectorOperations:
         query_embedding: list[float],
         k: int = 10,
         distance_metric: str = "cosine",
-        threshold: float | None = None
+        threshold: float | None = None,
     ) -> list[tuple]:
         """
         Search for similar embeddings using vec distance functions.
-        
+
         Args:
             conn: SQLite database connection
             table_name: Name of the vec table
@@ -291,7 +290,7 @@ class VectorOperations:
             k: Number of results to return
             distance_metric: Distance metric (cosine, l2, dot)
             threshold: Optional similarity threshold
-            
+
         Returns:
             List of (rowid, distance, metadata) tuples
         """
@@ -300,14 +299,15 @@ class VectorOperations:
             distance_functions = {
                 "cosine": "vec_distance_cosine",
                 "l2": "vec_distance_l2",
-                "dot": "-vec_distance_dot"  # Negative for similarity
+                "dot": "-vec_distance_dot",  # Negative for similarity
             }
 
             distance_func = distance_functions.get(distance_metric, "vec_distance_cosine")
 
             # Convert query embedding to bytes format for sqlite-vec
             import struct
-            query_bytes = struct.pack(f'{len(query_embedding)}f', *query_embedding)
+
+            query_bytes = struct.pack(f"{len(query_embedding)}f", *query_embedding)
 
             # Build query
             metadata_table = f"{table_name}_metadata"

@@ -9,7 +9,6 @@ from ...services.vector_extension import VectorExtensionLoader, VectorOperations
 
 
 class TestVectorExtensionLoader:
-
     def test_load_extension_success(self):
         """Test successful loading of sqlite-vec extension."""
         conn = sqlite3.connect(":memory:")
@@ -108,7 +107,6 @@ class TestVectorExtensionLoader:
 
 
 class TestVectorOperations:
-
     def test_insert_embedding_success(self):
         """Test successful embedding insertion."""
         conn = sqlite3.connect(":memory:")
@@ -125,7 +123,7 @@ class TestVectorOperations:
             "end_line": 1,
             "language": "python",
             "semantic_type": "function",
-            "content_hash": "12345"
+            "content_hash": "12345",
         }
 
         rowid = ops.insert_embedding(conn, "test_vecs", embedding, metadata)
@@ -165,7 +163,7 @@ class TestVectorOperations:
             "end_line": 1,
             "language": "python",
             "semantic_type": "function",
-            "content_hash": "hash1"
+            "content_hash": "hash1",
         }
 
         metadata2 = {
@@ -175,7 +173,7 @@ class TestVectorOperations:
             "end_line": 1,
             "language": "python",
             "semantic_type": "function",
-            "content_hash": "hash2"
+            "content_hash": "hash2",
         }
 
         metadata3 = {
@@ -185,7 +183,7 @@ class TestVectorOperations:
             "end_line": 1,
             "language": "python",
             "semantic_type": "function",
-            "content_hash": "hash3"
+            "content_hash": "hash3",
         }
 
         ops.insert_embedding(conn, "test_vecs", embedding1, metadata1)
@@ -217,8 +215,24 @@ class TestVectorOperations:
         embedding1 = [1.0, 0.0, 0.0]
         embedding2 = [0.0, 1.0, 0.0]  # 90 degrees apart, cosine distance ~1.0
 
-        metadata1 = {"file_path": "test1.py", "content": "content1", "start_line": 1, "end_line": 1, "language": "python", "semantic_type": "function", "content_hash": "hash1"}
-        metadata2 = {"file_path": "test2.py", "content": "content2", "start_line": 1, "end_line": 1, "language": "python", "semantic_type": "function", "content_hash": "hash2"}
+        metadata1 = {
+            "file_path": "test1.py",
+            "content": "content1",
+            "start_line": 1,
+            "end_line": 1,
+            "language": "python",
+            "semantic_type": "function",
+            "content_hash": "hash1",
+        }
+        metadata2 = {
+            "file_path": "test2.py",
+            "content": "content2",
+            "start_line": 1,
+            "end_line": 1,
+            "language": "python",
+            "semantic_type": "function",
+            "content_hash": "hash2",
+        }
 
         ops.insert_embedding(conn, "test_vecs", embedding1, metadata1)
         ops.insert_embedding(conn, "test_vecs", embedding2, metadata2)
@@ -244,7 +258,15 @@ class TestVectorOperations:
         ops = VectorOperations()
 
         embedding = [1.0, 2.0, 3.0]
-        metadata = {"file_path": "test.py", "content": "content", "start_line": 1, "end_line": 1, "language": "python", "semantic_type": "function", "content_hash": "hash"}
+        metadata = {
+            "file_path": "test.py",
+            "content": "content",
+            "start_line": 1,
+            "end_line": 1,
+            "language": "python",
+            "semantic_type": "function",
+            "content_hash": "hash",
+        }
 
         ops.insert_embedding(conn, "test_vecs", embedding, metadata)
 
@@ -289,13 +311,13 @@ class TestVectorOperations:
             "function_signature": "test_func() -> None",
             "class_name": None,
             "function_name": "test_func",
-            "parameter_types": '[]',
+            "parameter_types": "[]",
             "return_type": "None",
             "inheritance_chain": None,
             "import_statements": '["import os"]',
             "docstring": "Test function",
             "complexity_score": 1,
-            "dependencies": '[]',
+            "dependencies": "[]",
             "interfaces": None,
             "decorators": None,
         }
@@ -340,7 +362,15 @@ class TestVectorOperations:
 
         ops = VectorOperations()
         embedding = [1.0, 2.0, 3.0]
-        metadata = {"file_path": "test.py", "content": "content", "start_line": 1, "end_line": 1, "language": "python", "semantic_type": "function", "content_hash": "hash"}
+        metadata = {
+            "file_path": "test.py",
+            "content": "content",
+            "start_line": 1,
+            "end_line": 1,
+            "language": "python",
+            "semantic_type": "function",
+            "content_hash": "hash",
+        }
 
         # Try to insert into non-existent table
         result = ops.insert_embedding(conn, "nonexistent_table", embedding, metadata)
@@ -354,7 +384,6 @@ class TestVectorOperations:
 
 
 class TestVectorExtensionIntegration:
-
     def test_full_workflow(self):
         """Test complete workflow: create table, insert, search."""
         conn = sqlite3.connect(":memory:")
@@ -451,7 +480,15 @@ class TestVectorExtensionIntegration:
 
         # Try to insert wrong dimension
         wrong_embedding = [1.0, 2.0, 3.0]  # 3 dims instead of 5
-        metadata = {"file_path": "test.py", "content": "content", "start_line": 1, "end_line": 1, "language": "python", "semantic_type": "function", "content_hash": "hash"}
+        metadata = {
+            "file_path": "test.py",
+            "content": "content",
+            "start_line": 1,
+            "end_line": 1,
+            "language": "python",
+            "semantic_type": "function",
+            "content_hash": "hash",
+        }
 
         result = ops.insert_embedding(conn, "test_vecs", wrong_embedding, metadata)
         assert result is None  # Should fail gracefully
