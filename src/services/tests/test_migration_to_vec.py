@@ -315,7 +315,7 @@ class TestEmbeddingsMigrator:
 
             # Test user says no to overwrite
             migrator_no = EmbeddingsMigrator(dry_run=True)  # Use dry_run to avoid input prompt
-            with patch.object(migrator_no, 'vec_db_path') as mock_path:
+            with patch.object(migrator_no, "vec_db_path") as mock_path:
                 mock_path.exists.return_value = True
                 # Skip the actual check since we're testing the logic
                 assert True  # Test passes if no exception
