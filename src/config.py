@@ -38,8 +38,12 @@ class Config:
     ]
 
     # Vector database configuration
-    VECTOR_DB_PATH: Path = INDEX_CACHE_DIR / "embeddings.db"
+    VECTOR_DB_PATH: Path = INDEX_CACHE_DIR / "embeddings_vec.db"
     SIMILARITY_THRESHOLD: float = float(os.getenv("SIMILARITY_THRESHOLD", "0.7"))
+
+    # SQLite-vec configuration
+    VEC_DIMENSION: int = 768  # for jina-embeddings-v2-base-code
+    VEC_INDEX_TYPE: str = os.getenv("VEC_INDEX_TYPE", "flat")  # flat, ivf, hnsw
 
     # Performance optimization
     _quantization_env = os.getenv("ENABLE_QUANTIZATION", "true").lower()

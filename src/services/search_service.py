@@ -16,6 +16,7 @@ from ..config import get_settings
 from ..models.indexing_models import CodeChunk, SearchRequest, SearchResponse
 from .bm25_search import BM25SearchEngine
 from .db_migration import DatabaseMigration
+from .vector_extension import VectorExtensionLoader, VectorOperations
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,12 @@ class SearchService:
     def __init__(self):
         self.config = get_settings()
         self.model: SentenceTransformer | None = None
+
+        # Initialize sqlite-vec database
         self.db_path = self.config.VECTOR_DB_PATH
+        self.vec_loader = VectorExtensionLoader()
+        self.vec_ops = VectorOperations()
+
         self.bm25_engine = BM25SearchEngine()
         self._init_embedding_model()
         self._init_vector_db()
@@ -51,6 +57,34 @@ class SearchService:
             # Create cache directory if it doesn't exist
             self.config.INDEX_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
+            # Initialize with sqlite-vec extension
+            conn = sqlite3.connect(str(self.db_path))
+
+            # Load the sqlite-vec extension
+            if self.vec_loader.load_extension(conn):
+                logger.info("Successfully loaded sqlite-vec extension")
+
+                # Create vec0 tables
+                if self.vec_loader.create_vec_table(
+                    conn, "embeddings_vec", self.config.VEC_DIMENSION, self.config.VEC_INDEX_TYPE
+                ):
+                    logger.info("Successfully created vec0 tables")
+
+                # Test vec operations
+                if self.vec_loader.test_vec_operations(conn):
+                    logger.info("Vec operations test passed")
+
+                # Get vec info
+                info = self.vec_loader.get_vec_info(conn)
+                if info:
+                    logger.info(f"Vec info: {info}")
+            else:
+                logger.error("Failed to load sqlite-vec extension")
+                raise RuntimeError("SQLite-vec extension is required")
+
+            conn.close()
+
+            # Initialize legacy database for migration compatibility
             # Run database migration first
             migration = DatabaseMigration()
             import asyncio
@@ -67,56 +101,53 @@ class SearchService:
                 asyncio.set_event_loop(loop)
                 loop.run_until_complete(migration.migrate_to_metadata_schema())
 
-            # Initialize SQLite database with vector extension
-            conn = sqlite3.connect(str(self.db_path))
+            # Initialize legacy database for migration compatibility
+            legacy_db_path = self.config.INDEX_CACHE_DIR / "embeddings.db"
+            legacy_conn = sqlite3.connect(str(legacy_db_path))
 
             # Create embeddings table with metadata fields
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS embeddings (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    file_path TEXT NOT NULL,
-                    content TEXT NOT NULL,
-                    start_line INTEGER NOT NULL,
-                    end_line INTEGER NOT NULL,
-                    language TEXT NOT NULL,
-                    semantic_type TEXT NOT NULL,
-                    embedding BLOB,
-                    content_hash TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    function_signature TEXT,
-                    class_name TEXT,
-                    function_name TEXT,
-                    parameter_types TEXT,
-                    return_type TEXT,
-                    inheritance_chain TEXT,
-                    import_statements TEXT,
-                    docstring TEXT,
-                    complexity_score INTEGER,
-                    dependencies TEXT,
-                    interfaces TEXT,
-                    decorators TEXT,
-                    UNIQUE(file_path, start_line, end_line)
-                )
-            """)
+            legacy_conn.execute("""
+                    CREATE TABLE IF NOT EXISTS embeddings (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        file_path TEXT NOT NULL,
+                        content TEXT NOT NULL,
+                        start_line INTEGER NOT NULL,
+                        end_line INTEGER NOT NULL,
+                        language TEXT NOT NULL,
+                        semantic_type TEXT NOT NULL,
+                        embedding BLOB,
+                        content_hash TEXT NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        function_signature TEXT,
+                        class_name TEXT,
+                        function_name TEXT,
+                        parameter_types TEXT,
+                        return_type TEXT,
+                        inheritance_chain TEXT,
+                        import_statements TEXT,
+                        docstring TEXT,
+                        complexity_score INTEGER,
+                        dependencies TEXT,
+                        interfaces TEXT,
+                        decorators TEXT,
+                        UNIQUE(file_path, start_line, end_line)
+                    )
+                """)
 
             # Create indexes for performance
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_language ON embeddings(language)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_semantic_type ON embeddings(semantic_type)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_file_path ON embeddings(file_path)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_content_hash ON embeddings(content_hash)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_function_name ON embeddings(function_name)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_class_name ON embeddings(class_name)")
+            legacy_conn.execute("CREATE INDEX IF NOT EXISTS idx_language ON embeddings(language)")
+            legacy_conn.execute("CREATE INDEX IF NOT EXISTS idx_semantic_type ON embeddings(semantic_type)")
+            legacy_conn.execute("CREATE INDEX IF NOT EXISTS idx_file_path ON embeddings(file_path)")
+            legacy_conn.execute("CREATE INDEX IF NOT EXISTS idx_content_hash ON embeddings(content_hash)")
+            legacy_conn.execute("CREATE INDEX IF NOT EXISTS idx_function_name ON embeddings(function_name)")
+            legacy_conn.execute("CREATE INDEX IF NOT EXISTS idx_class_name ON embeddings(class_name)")
+            legacy_conn.execute("CREATE INDEX IF NOT EXISTS idx_complexity ON embeddings(complexity_score)")
+            legacy_conn.execute("CREATE INDEX IF NOT EXISTS idx_return_type ON embeddings(return_type)")
 
-            # Create metadata indexes
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_function_name ON embeddings(function_name)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_class_name ON embeddings(class_name)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_complexity ON embeddings(complexity_score)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_return_type ON embeddings(return_type)")
+            legacy_conn.commit()
+            legacy_conn.close()
 
-            conn.commit()
-            conn.close()
-
-            logger.info(f"Initialized vector database at {self.db_path}")
+            logger.info(f"Initialized legacy database at {legacy_db_path}")
 
         except Exception as e:
             logger.error(f"Failed to initialize vector database: {e}")
@@ -176,16 +207,14 @@ class SearchService:
         return quantized.astype(np.float32) / 127.0  # Convert back to float32
 
     async def _store_embeddings_batch(self, chunks: list[CodeChunk]) -> None:
-        """Store batch of embeddings in vector database."""
+        """Store batch of embeddings in vector database using sqlite-vec."""
         try:
             conn = sqlite3.connect(str(self.db_path))
+            self.vec_loader.load_extension(conn)
 
             for chunk in chunks:
                 if chunk.embedding is None:
                     continue
-
-                # Convert embedding to binary
-                embedding_blob = json.dumps(chunk.embedding).encode()
 
                 # Calculate content hash for deduplication
                 content_hash = hash(chunk.content)
@@ -198,39 +227,31 @@ class SearchService:
                 interfaces_json = json.dumps(chunk.interfaces) if chunk.interfaces else None
                 decorators_json = json.dumps(chunk.decorators) if chunk.decorators else None
 
-                # Insert or replace embedding with metadata
-                conn.execute(
-                    """
-                    INSERT OR REPLACE INTO embeddings
-                    (file_path, content, start_line, end_line, language, semantic_type,
-                     embedding, content_hash, function_signature, class_name, function_name,
-                     parameter_types, return_type, inheritance_chain, import_statements,
-                     docstring, complexity_score, dependencies, interfaces, decorators)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                    (
-                        chunk.file_path,
-                        chunk.content,
-                        chunk.start_line,
-                        chunk.end_line,
-                        chunk.language,
-                        chunk.semantic_type,
-                        embedding_blob,
-                        str(content_hash),
-                        chunk.function_signature,
-                        chunk.class_name,
-                        chunk.function_name,
-                        parameter_types_json,
-                        chunk.return_type,
-                        inheritance_chain_json,
-                        import_statements_json,
-                        chunk.docstring,
-                        chunk.complexity_score,
-                        dependencies_json,
-                        interfaces_json,
-                        decorators_json,
-                    ),
-                )
+                # Prepare metadata
+                metadata = {
+                    "file_path": chunk.file_path,
+                    "content": chunk.content,
+                    "start_line": chunk.start_line,
+                    "end_line": chunk.end_line,
+                    "language": chunk.language,
+                    "semantic_type": chunk.semantic_type,
+                    "content_hash": str(content_hash),
+                    "function_signature": chunk.function_signature,
+                    "class_name": chunk.class_name,
+                    "function_name": chunk.function_name,
+                    "parameter_types": parameter_types_json,
+                    "return_type": chunk.return_type,
+                    "inheritance_chain": inheritance_chain_json,
+                    "import_statements": import_statements_json,
+                    "docstring": chunk.docstring,
+                    "complexity_score": chunk.complexity_score,
+                    "dependencies": dependencies_json,
+                    "interfaces": interfaces_json,
+                    "decorators": decorators_json,
+                }
+
+                # Insert using sqlite-vec operations
+                self.vec_ops.insert_embedding(conn, "embeddings_vec", chunk.embedding, metadata)
 
             conn.commit()
             conn.close()
@@ -254,8 +275,8 @@ class SearchService:
             if self.config.ENABLE_QUANTIZATION:
                 query_embedding = self._quantize_embeddings(query_embedding.reshape(1, -1))[0]
 
-            # Search database for similar embeddings
-            results = await self._search_similar_embeddings(
+            # Search database for similar embeddings using sqlite-vec
+            results = await self._search_similar_embeddings_vec(
                 query_embedding, request.language, request.max_results, request.similarity_threshold
             )
 
@@ -267,87 +288,70 @@ class SearchService:
             logger.error(f"Error during semantic search: {e}")
             return SearchResponse(results=[], total_matches=0, query_time_ms=0.0)
 
-    async def _search_similar_embeddings(
+    async def _search_similar_embeddings_vec(
         self, query_embedding: np.ndarray, language_filter: str | None, max_results: int, threshold: float
     ) -> list[CodeChunk]:
-        """Search for similar embeddings in vector database."""
+        """Search for similar embeddings using sqlite-vec."""
         try:
             conn = sqlite3.connect(str(self.db_path))
+            self.vec_loader.load_extension(conn)
 
-            # Build query with optional language filter
-            base_query = """
-                SELECT file_path, content, start_line, end_line, language, semantic_type, embedding,
-                       function_signature, class_name, function_name, parameter_types, return_type,
-                       inheritance_chain, import_statements, docstring, complexity_score,
-                       dependencies, interfaces, decorators
-                FROM embeddings
-            """
+            # Convert similarity threshold to distance threshold (cosine distance)
+            # sqlite-vec returns distance where 0 = identical, higher = less similar
+            distance_threshold = 1.0 - threshold
 
-            params = []
-            if language_filter:
-                base_query += " WHERE language = ?"
-                params.append(language_filter)
+            # Use sqlite-vec search
+            results = self.vec_ops.search_similar(
+                conn,
+                "embeddings_vec",
+                query_embedding.tolist(),
+                k=max_results,
+                distance_metric="cosine",
+                threshold=distance_threshold,
+            )
 
-            cursor = conn.execute(base_query)
-            rows = cursor.fetchall()
-
-            # Calculate similarities
-            similarities: list[tuple[float, CodeChunk]] = []
-
-            for row in rows:
-                try:
-                    # Decode embedding
-                    embedding_blob = row[6]
-                    stored_embedding = np.array(json.loads(embedding_blob.decode()))
-
-                    # Calculate cosine similarity
-                    similarity = self._cosine_similarity(query_embedding, stored_embedding)
-
-                    if similarity >= threshold:
-                        # Deserialize metadata fields
-                        parameter_types = json.loads(row[10]) if row[10] else None
-                        inheritance_chain = json.loads(row[12]) if row[12] else None
-                        import_statements = json.loads(row[13]) if row[13] else None
-                        dependencies = json.loads(row[16]) if row[16] else None
-                        interfaces = json.loads(row[17]) if row[17] else None
-                        decorators = json.loads(row[18]) if row[18] else None
-
-                        chunk = CodeChunk(
-                            file_path=row[0],
-                            content=row[1],
-                            start_line=row[2],
-                            end_line=row[3],
-                            language=row[4],
-                            semantic_type=row[5],
-                            embedding=stored_embedding.tolist(),
-                            function_signature=row[7],
-                            class_name=row[8],
-                            function_name=row[9],
-                            parameter_types=parameter_types,
-                            return_type=row[11],
-                            inheritance_chain=inheritance_chain,
-                            import_statements=import_statements,
-                            docstring=row[14],
-                            complexity_score=row[15],
-                            dependencies=dependencies,
-                            interfaces=interfaces,
-                            decorators=decorators,
-                        )
-                        similarities.append((similarity, chunk))
-
-                except Exception as e:
-                    logger.debug(f"Error processing embedding row: {e}")
+            chunks = []
+            for _rowid, _distance, metadata in results:
+                # Apply language filter if specified
+                if language_filter and metadata.get("language") != language_filter:
                     continue
 
-            # Sort by similarity and return top results
-            similarities.sort(reverse=True)
-            results = [chunk for _, chunk in similarities[:max_results]]
+                # Deserialize JSON metadata fields
+                parameter_types = json.loads(metadata["parameter_types"]) if metadata["parameter_types"] else None
+                inheritance_chain = json.loads(metadata["inheritance_chain"]) if metadata["inheritance_chain"] else None
+                import_statements = json.loads(metadata["import_statements"]) if metadata["import_statements"] else None
+                dependencies = json.loads(metadata["dependencies"]) if metadata["dependencies"] else None
+                interfaces = json.loads(metadata["interfaces"]) if metadata["interfaces"] else None
+                decorators = json.loads(metadata["decorators"]) if metadata["decorators"] else None
+
+                chunk = CodeChunk(
+                    file_path=metadata["file_path"],
+                    content=metadata["content"],
+                    start_line=metadata["start_line"],
+                    end_line=metadata["end_line"],
+                    language=metadata["language"],
+                    semantic_type=metadata["semantic_type"],
+                    embedding=None,  # Don't return embedding data for search results
+                    function_signature=metadata["function_signature"],
+                    class_name=metadata["class_name"],
+                    function_name=metadata["function_name"],
+                    parameter_types=parameter_types,
+                    return_type=metadata["return_type"],
+                    inheritance_chain=inheritance_chain,
+                    import_statements=import_statements,
+                    docstring=metadata["docstring"],
+                    complexity_score=metadata["complexity_score"],
+                    dependencies=dependencies,
+                    interfaces=interfaces,
+                    decorators=decorators,
+                )
+                chunks.append(chunk)
 
             conn.close()
-            return results
+            return chunks
 
         except Exception as e:
-            logger.error(f"Error searching embeddings: {e}")
+            logger.error(f"Error searching embeddings with sqlite-vec: {e}")
             return []
 
     def _cosine_similarity(self, a: np.ndarray, b: np.ndarray) -> float:
@@ -392,7 +396,7 @@ class SearchService:
                            function_signature, class_name, function_name, parameter_types, return_type,
                            inheritance_chain, import_statements, docstring, complexity_score,
                            dependencies, interfaces, decorators
-                    FROM embeddings
+                    FROM embeddings_vec_metadata
                     WHERE file_path = ? AND start_line = ?
                     """,
                     (file_path, start_line),
@@ -448,7 +452,7 @@ class SearchService:
                        function_signature, class_name, function_name, parameter_types, return_type,
                        inheritance_chain, import_statements, docstring, complexity_score,
                        dependencies, interfaces, decorators
-                FROM embeddings
+                FROM embeddings_vec_metadata
                 WHERE content LIKE ?
             """
 
@@ -508,12 +512,12 @@ class SearchService:
             conn = sqlite3.connect(str(self.db_path))
 
             # Get total count
-            total_count = conn.execute("SELECT COUNT(*) FROM embeddings").fetchone()[0]
+            total_count = conn.execute("SELECT COUNT(*) FROM embeddings_vec_metadata").fetchone()[0]
 
             # Get language distribution
             lang_stats = conn.execute("""
                 SELECT language, COUNT(*) as count
-                FROM embeddings
+                FROM embeddings_vec_metadata
                 GROUP BY language
                 ORDER BY count DESC
             """).fetchall()
@@ -521,7 +525,7 @@ class SearchService:
             # Get semantic type distribution
             type_stats = conn.execute("""
                 SELECT semantic_type, COUNT(*) as count
-                FROM embeddings
+                FROM embeddings_vec_metadata
                 GROUP BY semantic_type
                 ORDER BY count DESC
             """).fetchall()
@@ -545,10 +549,17 @@ class SearchService:
         """Remove embeddings for specific files from the database."""
         try:
             conn = sqlite3.connect(str(self.db_path))
+            self.vec_loader.load_extension(conn)
 
             # Delete embeddings for specified files
             placeholders = ",".join("?" * len(file_paths))
-            conn.execute(f"DELETE FROM embeddings WHERE file_path IN ({placeholders})", file_paths)
+            # Delete from both vec table and metadata table
+            conn.execute(
+                f"DELETE FROM embeddings_vec WHERE rowid IN "
+                f"(SELECT rowid FROM embeddings_vec_metadata WHERE file_path IN ({placeholders}))",
+                file_paths,
+            )
+            conn.execute(f"DELETE FROM embeddings_vec_metadata WHERE file_path IN ({placeholders})", file_paths)
 
             conn.commit()
             conn.close()
@@ -562,7 +573,10 @@ class SearchService:
         """Clear all embeddings from the database."""
         try:
             conn = sqlite3.connect(str(self.db_path))
-            conn.execute("DELETE FROM embeddings")
+            self.vec_loader.load_extension(conn)
+            # Clear both vec table and metadata table
+            conn.execute("DELETE FROM embeddings_vec")
+            conn.execute("DELETE FROM embeddings_vec_metadata")
             conn.commit()
             conn.close()
 
