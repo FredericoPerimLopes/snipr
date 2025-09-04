@@ -30,6 +30,7 @@ def mock_indexing_service():
     """Mock IndexingService for testing."""
     with patch("src.tools.index_codebase.indexing_service") as mock:
         mock.index_codebase = AsyncMock()
+        mock.index_codebase_with_progress = AsyncMock()
         mock.get_indexing_status = AsyncMock()
         mock.needs_reindexing = AsyncMock()
         yield mock
@@ -43,9 +44,20 @@ def mock_search_service():
         yield mock
 
 
+@pytest.fixture
+def mock_task_registry():
+    """Mock TaskRegistry for testing."""
+    with patch("src.tools.index_codebase.task_registry") as mock:
+        mock.get_active_task_for_codebase = Mock(return_value=None)
+        mock.register_task = Mock(return_value="test-task-id")
+        mock.start_background_task = Mock()
+        mock.update_task = Mock()
+        yield mock
+
+
 class TestIndexCodebaseTool:
     @pytest.mark.asyncio
-    async def test_index_codebase_success(self, temp_codebase, mock_indexing_service, mock_search_service):
+    async def test_index_codebase_success(self, temp_codebase, mock_indexing_service, mock_search_service, mock_task_registry):
         """Test successful codebase indexing."""
         # Setup mocks
         mock_indexing_service.needs_reindexing.return_value = True
@@ -68,13 +80,11 @@ class TestIndexCodebaseTool:
         result_json = await index_codebase(str(temp_codebase))
         result = json.loads(result_json)
 
-        # Verify response
-        assert result["status"] == "success"
-        assert "indexing_result" in result
-        assert "indexing_status" in result
-        assert "embeddings_stats" in result
-        assert result["indexing_result"]["indexed_files"] == 2
-        assert result["indexing_result"]["total_chunks"] == 4
+        # Verify response (now returns "started" for async indexing)
+        assert result["status"] == "started"
+        assert "task_id" in result
+        assert result["codebase_path"] == str(temp_codebase)
+        assert "Indexing started" in result["message"]
 
     @pytest.mark.asyncio
     async def test_index_codebase_already_indexed(self, temp_codebase, mock_indexing_service, mock_search_service):
@@ -95,7 +105,7 @@ class TestIndexCodebaseTool:
         assert "already up to date" in result["message"]
 
     @pytest.mark.asyncio
-    async def test_index_codebase_with_language_filter(self, temp_codebase, mock_indexing_service, mock_search_service):
+    async def test_index_codebase_with_language_filter(self, temp_codebase, mock_indexing_service, mock_search_service, mock_task_registry):
         """Test indexing with language filtering."""
         # Setup mocks
         mock_indexing_service.needs_reindexing.return_value = True
@@ -111,9 +121,10 @@ class TestIndexCodebaseTool:
         result_json = await index_codebase(str(temp_codebase), languages="python", exclude_patterns="**/*.js")
         result = json.loads(result_json)
 
-        # Verify response
-        assert result["status"] == "success"
-        assert result["indexing_result"]["languages_detected"] == ["python"]
+        # Verify response (now returns "started" for async indexing)
+        assert result["status"] == "started"
+        assert "task_id" in result
+        assert result["codebase_path"] == str(temp_codebase)
 
     @pytest.mark.asyncio
     async def test_index_codebase_invalid_path(self, mock_indexing_service, mock_search_service):
@@ -177,7 +188,7 @@ class TestIndexCodebaseTool:
         assert not test_file.exists()
 
     @pytest.mark.asyncio
-    async def test_index_codebase_json_response_format(self, temp_codebase, mock_indexing_service, mock_search_service):
+    async def test_index_codebase_json_response_format(self, temp_codebase, mock_indexing_service, mock_search_service, mock_task_registry):
         """Test that tool returns valid JSON string."""
         # Setup mocks
         mock_indexing_service.needs_reindexing.return_value = True
@@ -196,6 +207,8 @@ class TestIndexCodebaseTool:
         result = json.loads(result_json)  # Should not raise exception
         assert isinstance(result, dict)
         assert "status" in result
+        # Now expects "started" status for async indexing
+        assert result["status"] == "started"
 
         # Verify it's a string (MCP requirement)
         assert isinstance(result_json, str)
