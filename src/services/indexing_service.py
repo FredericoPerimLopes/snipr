@@ -133,9 +133,15 @@ class IndexingService:
         import sqlite3
 
         conn = sqlite3.connect(str(self.config.VECTOR_DB_PATH))
-        cursor = conn.execute("SELECT COUNT(*) FROM embeddings_vec_metadata")
-        existing_chunks = cursor.fetchone()[0] or 0
-        conn.close()
+        try:
+            cursor = conn.execute("SELECT COUNT(*) FROM embeddings_vec_metadata")
+            existing_chunks = cursor.fetchone()[0] or 0
+        except sqlite3.OperationalError:
+            # Table doesn't exist yet, this is definitely initial indexing
+            existing_chunks = 0
+        finally:
+            conn.close()
+            
         is_initial_indexing = existing_chunks == 0
         indexing_logger.log_phase_end(
             "DATABASE_CHECK", 0.0, existing_chunks=existing_chunks, initial_indexing=is_initial_indexing
@@ -312,9 +318,14 @@ class IndexingService:
             import sqlite3
 
             conn = sqlite3.connect(str(self.config.VECTOR_DB_PATH))
-            cursor = conn.execute("SELECT COUNT(*) FROM embeddings_vec_metadata")
-            existing_chunks = cursor.fetchone()[0] or 0
-            conn.close()
+            try:
+                cursor = conn.execute("SELECT COUNT(*) FROM embeddings_vec_metadata")
+                existing_chunks = cursor.fetchone()[0] or 0
+            except sqlite3.OperationalError:
+                # Table doesn't exist yet, this is definitely initial indexing
+                existing_chunks = 0
+            finally:
+                conn.close()
             is_initial_indexing = existing_chunks == 0
 
             indexing_logger.log_info(
@@ -971,14 +982,20 @@ class IndexingService:
             import sqlite3
 
             conn = sqlite3.connect(str(self.config.VECTOR_DB_PATH))
-            cursor = conn.execute("SELECT COUNT(DISTINCT file_path) FROM embeddings_vec_metadata")
-            total_files = cursor.fetchone()[0] or 0
+            try:
+                cursor = conn.execute("SELECT COUNT(DISTINCT file_path) FROM embeddings_vec_metadata")
+                total_files = cursor.fetchone()[0] or 0
 
-            # Get last indexed timestamp from newest record
-            cursor = conn.execute("SELECT MAX(created_at) FROM embeddings_vec_metadata")
-            last_indexed_result = cursor.fetchone()
-            last_indexed = last_indexed_result[0] if last_indexed_result and last_indexed_result[0] else None
-            conn.close()
+                # Get last indexed timestamp from newest record
+                cursor = conn.execute("SELECT MAX(created_at) FROM embeddings_vec_metadata")
+                last_indexed_result = cursor.fetchone()
+                last_indexed = last_indexed_result[0] if last_indexed_result and last_indexed_result[0] else None
+            except sqlite3.OperationalError:
+                # Table doesn't exist yet
+                total_files = 0
+                last_indexed = None
+            finally:
+                conn.close()
 
             is_indexed = stats["total_embeddings"] > 0
 
@@ -1001,9 +1018,14 @@ class IndexingService:
             import sqlite3
 
             conn = sqlite3.connect(str(self.config.VECTOR_DB_PATH))
-            cursor = conn.execute("SELECT COUNT(*) FROM embeddings_vec_metadata")
-            total_chunks = cursor.fetchone()[0] or 0
-            conn.close()
+            try:
+                cursor = conn.execute("SELECT COUNT(*) FROM embeddings_vec_metadata")
+                total_chunks = cursor.fetchone()[0] or 0
+            except sqlite3.OperationalError:
+                # Table doesn't exist yet, need initial indexing
+                total_chunks = 0
+            finally:
+                conn.close()
 
             # If no chunks exist, need initial indexing
             if total_chunks == 0:
