@@ -10,119 +10,114 @@ from ...services.migration_to_vec import EmbeddingsMigrator
 
 
 @pytest.fixture
-def migrator_config():
-    """Mock configuration for migration testing."""
+def temp_dirs():
+    """Create temporary directories for testing."""
+    legacy_temp = tempfile.mkdtemp()
+    vec_temp = tempfile.mkdtemp()
+
+    legacy_path = Path(legacy_temp) / "legacy.db"
+    vec_path = Path(vec_temp) / "vec.db"
+
+    yield legacy_path, vec_path
+
+    # Cleanup
+    import shutil
+
+    shutil.rmtree(legacy_temp, ignore_errors=True)
+    shutil.rmtree(vec_temp, ignore_errors=True)
+
+
+@pytest.fixture
+def migrator_config(temp_dirs):
+    """Mock configuration for testing."""
+    legacy_path, vec_path = temp_dirs
+
     config = Mock()
-    config.VEC_DIMENSION = 3
+    config.VECTOR_DB_PATH = legacy_path
+    config.VEC_DB_PATH = vec_path
+    config.VEC_DIMENSION = 3  # Small dimension for testing
     config.VEC_INDEX_TYPE = "flat"
+
     return config
 
 
-class TestEmbeddingsMigrator:
-    @pytest.fixture
-    def temp_dirs(self):
-        """Create temporary directories for testing."""
-        legacy_temp = tempfile.mkdtemp()
-        vec_temp = tempfile.mkdtemp()
+@pytest.fixture
+def legacy_db_with_data(temp_dirs):
+    """Create legacy database with test data."""
+    legacy_path, _ = temp_dirs
 
-        legacy_path = Path(legacy_temp) / "legacy.db"
-        vec_path = Path(vec_temp) / "vec.db"
+    conn = sqlite3.connect(str(legacy_path))
 
-        yield legacy_path, vec_path
+    # Create legacy table structure
+    conn.execute("""
+        CREATE TABLE embeddings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            file_path TEXT NOT NULL,
+            content TEXT NOT NULL,
+            start_line INTEGER NOT NULL,
+            end_line INTEGER NOT NULL,
+            language TEXT NOT NULL,
+            semantic_type TEXT NOT NULL,
+            embedding BLOB,
+            content_hash TEXT NOT NULL,
+            function_signature TEXT,
+            class_name TEXT,
+            function_name TEXT,
+            parameter_types TEXT,
+            return_type TEXT,
+            inheritance_chain TEXT,
+            import_statements TEXT,
+            docstring TEXT,
+            complexity_score INTEGER,
+            dependencies TEXT,
+            interfaces TEXT,
+            decorators TEXT
+        )
+    """)
 
-        # Cleanup
-        import shutil
+    # Insert test data
+    test_embeddings = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
 
-        shutil.rmtree(legacy_temp, ignore_errors=True)
-        shutil.rmtree(vec_temp, ignore_errors=True)
-
-    @pytest.fixture
-    def migrator_config(self, temp_dirs):
-        """Mock configuration for testing."""
-        legacy_path, vec_path = temp_dirs
-
-        config = Mock()
-        config.VECTOR_DB_PATH = legacy_path
-        config.VEC_DB_PATH = vec_path
-        config.VEC_DIMENSION = 3  # Small dimension for testing
-        config.VEC_INDEX_TYPE = "flat"
-
-        return config
-
-    @pytest.fixture
-    def legacy_db_with_data(self, temp_dirs):
-        """Create legacy database with test data."""
-        legacy_path, _ = temp_dirs
-
-        conn = sqlite3.connect(str(legacy_path))
-
-        # Create legacy table structure
-        conn.execute("""
-            CREATE TABLE embeddings (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                file_path TEXT NOT NULL,
-                content TEXT NOT NULL,
-                start_line INTEGER NOT NULL,
-                end_line INTEGER NOT NULL,
-                language TEXT NOT NULL,
-                semantic_type TEXT NOT NULL,
-                embedding BLOB,
-                content_hash TEXT NOT NULL,
-                function_signature TEXT,
-                class_name TEXT,
-                function_name TEXT,
-                parameter_types TEXT,
-                return_type TEXT,
-                inheritance_chain TEXT,
-                import_statements TEXT,
-                docstring TEXT,
-                complexity_score INTEGER,
-                dependencies TEXT,
-                interfaces TEXT,
-                decorators TEXT
-            )
-        """)
-
-        # Insert test data
-        test_embeddings = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
-
-        for i, embedding in enumerate(test_embeddings):
-            embedding_blob = json.dumps(embedding).encode()
-            conn.execute(
-                """
-                INSERT INTO embeddings
-                (file_path, content, start_line, end_line, language, semantic_type,
-                 embedding, content_hash, function_name)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-                (
-                    f"test{i}.py",
-                    f"def func{i}(): pass",
-                    i + 1,
-                    i + 1,
-                    "python",
-                    "function",
-                    embedding_blob,
-                    f"hash{i}",
-                    f"func{i}",
-                ),
-            )
-
-        # Insert one without embedding (should be skipped)
+    for i, embedding in enumerate(test_embeddings):
+        embedding_blob = json.dumps(embedding).encode()
         conn.execute(
             """
             INSERT INTO embeddings
             (file_path, content, start_line, end_line, language, semantic_type,
-             content_hash, function_name)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+             embedding, content_hash, function_name)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
-            ("no_embedding.py", "def no_embedding(): pass", 10, 10, "python", "function", "hash_none", "no_embedding"),
+            (
+                f"test{i}.py",
+                f"def func{i}(): pass",
+                i + 1,
+                i + 1,
+                "python",
+                "function",
+                embedding_blob,
+                f"hash{i}",
+                f"func{i}",
+            ),
         )
 
-        conn.commit()
-        conn.close()
+    # Insert one without embedding (should be skipped)
+    conn.execute(
+        """
+        INSERT INTO embeddings
+        (file_path, content, start_line, end_line, language, semantic_type,
+         content_hash, function_name)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """,
+        ("no_embedding.py", "def no_embedding(): pass", 10, 10, "python", "function", "hash_none", "no_embedding"),
+    )
 
-        return legacy_path
+    conn.commit()
+    conn.close()
+
+    return legacy_path
+
+
+class TestEmbeddingsMigrator:
 
     def test_check_prerequisites_success(self, migrator_config, legacy_db_with_data):
         """Test successful prerequisites check."""
