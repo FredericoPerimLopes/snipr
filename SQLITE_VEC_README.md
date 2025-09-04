@@ -4,13 +4,10 @@ This guide covers the integration of the sqlite-vec extension for optimized vect
 
 ## 🚀 Quick Start
 
-### Enable SQLite-vec
+### Run with SQLite-vec
 
 ```bash
-# Set environment variable to enable sqlite-vec
-export USE_SQLITE_VEC=true
-
-# Run Snipr with sqlite-vec enabled
+# Run Snipr with sqlite-vec (enabled by default)
 uv run python src/main.py
 ```
 
@@ -19,8 +16,6 @@ uv run python src/main.py
 ```bash
 # Test sqlite-vec functionality
 uv run python -c "
-import os
-os.environ['USE_SQLITE_VEC'] = 'true'
 from src.services.vector_extension import VectorExtensionLoader
 import sqlite3
 
@@ -82,9 +77,6 @@ uv run python -m src.services.migration_to_vec --verify-only
 ### Environment Variables
 
 ```bash
-# Enable/disable sqlite-vec (default: false)
-export USE_SQLITE_VEC=true
-
 # Vector index type (flat, ivf, hnsw)
 export VEC_INDEX_TYPE=flat
 
@@ -95,25 +87,19 @@ export VEC_INDEX_TYPE=flat
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `USE_SQLITE_VEC` | false | Enable sqlite-vec extension |
 | `VEC_DIMENSION` | 768 | Embedding vector dimensions |
 | `VEC_INDEX_TYPE` | flat | Index type (flat/ivf/hnsw) |
-| `VEC_DB_PATH` | .index_cache/embeddings_vec.db | Vec database location |
+| `VECTOR_DB_PATH` | .index_cache/embeddings_vec.db | Vec database location |
 
 ## 🏗️ Architecture
 
-### Dual-System Support
+### SQLite-vec Architecture
 
-The implementation supports both legacy and sqlite-vec systems simultaneously:
+The implementation uses sqlite-vec for all vector operations:
 
 ```python
-# Feature flag controls which system is used
-if config.USE_SQLITE_VEC:
-    # Use optimized sqlite-vec operations
-    results = vec_ops.search_similar(...)
-else:
-    # Fall back to legacy Python-based search
-    results = legacy_search(...)
+# SQLite-vec is used by default for all operations
+results = vec_ops.search_similar(...)
 ```
 
 ### Database Structure
@@ -181,8 +167,8 @@ export VEC_INDEX_TYPE=hnsw
 # Test vec extension functionality
 uv run pytest src/services/tests/test_sqlite_vec.py -v
 
-# Test search service with vec enabled
-USE_SQLITE_VEC=true uv run pytest src/services/tests/test_search_service.py -v
+# Test search service
+uv run pytest src/services/tests/test_search_service.py -v
 ```
 
 ### Manual Testing
@@ -232,27 +218,13 @@ git checkout feature/sqlite-vec-integration
 # Install dependencies
 uv pip install -r pyproject.toml
 
-# Enable sqlite-vec
-export USE_SQLITE_VEC=true
-
-# Run the application
+# Run the application (sqlite-vec enabled by default)
 uv run python src/main.py
 ```
 
 ### Production Deployment
 
-1. **Gradual Rollout** (Recommended)
-
-```python
-# In production config
-import random
-
-# Start with 10% of queries using vec
-if random.random() < 0.1:
-    os.environ['USE_SQLITE_VEC'] = 'true'
-```
-
-2. **Full Migration**
+**Production Migration**
 
 ```bash
 # 1. Backup existing database
@@ -264,10 +236,7 @@ uv run python -m src.services.migration_to_vec
 # 3. Verify migration
 uv run python -m src.services.migration_to_vec --verify-only
 
-# 4. Enable sqlite-vec
-export USE_SQLITE_VEC=true
-
-# 5. Deploy application
+# 4. Deploy application (sqlite-vec enabled by default)
 ```
 
 ### Docker Deployment
@@ -289,8 +258,7 @@ WORKDIR /app
 RUN pip install uv
 RUN uv pip install -r pyproject.toml
 
-# Enable sqlite-vec
-ENV USE_SQLITE_VEC=true
+# SQLite-vec enabled by default
 
 CMD ["uv", "run", "python", "src/main.py"]
 ```
@@ -300,11 +268,8 @@ CMD ["uv", "run", "python", "src/main.py"]
 If you need to rollback to the legacy system:
 
 ```bash
-# 1. Disable sqlite-vec
-export USE_SQLITE_VEC=false
-
-# 2. Application will automatically use legacy database
-# No data loss - legacy database remains intact
+# Rollback requires code changes to disable sqlite-vec
+# Legacy database remains intact for migration compatibility
 ```
 
 ## 📊 Monitoring
@@ -365,8 +330,8 @@ uv run python -m src.services.migration_to_vec --batch-size 10
 # Verify vec database has data
 sqlite3 .index_cache/embeddings_vec.db "SELECT COUNT(*) FROM embeddings_vec;"
 
-# Check if extension is enabled
-echo $USE_SQLITE_VEC  # Should output: true
+# SQLite-vec is enabled by default
+# Check if working by running a test search
 ```
 
 ### Debug Mode
