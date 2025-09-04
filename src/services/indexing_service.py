@@ -141,7 +141,7 @@ class IndexingService:
             existing_chunks = 0
         finally:
             conn.close()
-            
+
         is_initial_indexing = existing_chunks == 0
         indexing_logger.log_phase_end(
             "DATABASE_CHECK", 0.0, existing_chunks=existing_chunks, initial_indexing=is_initial_indexing
