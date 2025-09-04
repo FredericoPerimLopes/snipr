@@ -124,10 +124,23 @@ class IndexingService:
         # Validate codebase path
         codebase_path = validate_codebase_path(request.codebase_path)
 
-        # Use enhanced change detection
-        modified_files, new_files, deleted_files = await self.update_service.detect_changes(str(codebase_path))
+        # Check if this is initial indexing or incremental update
+        metadata_path = self.config.INDEX_CACHE_DIR / "index_metadata.json"
+        is_initial_indexing = not metadata_path.exists()
 
-        files_to_process = [Path(f) for f in modified_files + new_files]
+        if is_initial_indexing:
+            # Initial indexing: process all source files
+            logger.info("Performing initial full codebase indexing")
+            all_source_files = await self._discover_source_files(
+                codebase_path, request.languages, request.exclude_patterns or []
+            )
+            files_to_process = all_source_files
+            modified_files, new_files, deleted_files = [], [str(f) for f in all_source_files], []
+        else:
+            # Incremental indexing: use enhanced change detection
+            modified_files, new_files, deleted_files = await self.update_service.detect_changes(str(codebase_path))
+            files_to_process = [Path(f) for f in modified_files + new_files]
+
         total_changed_files = len(files_to_process) + len(deleted_files)
 
         if total_changed_files == 0:
@@ -695,7 +708,7 @@ class IndexingService:
             return IndexingStatus(is_indexed=False, total_files=0, total_chunks=0, index_size_mb=0.0)
 
     async def needs_reindexing(self, codebase_path: str) -> bool:
-        """Check if codebase needs reindexing based on file changes."""
+        """Check if codebase needs reindexing based on file changes or new files."""
         metadata_path = self.config.INDEX_CACHE_DIR / "index_metadata.json"
 
         if not metadata_path.exists():
@@ -707,7 +720,7 @@ class IndexingService:
 
             stored_hashes = metadata.get("file_hashes", {})
 
-            # Check if any tracked files have changed
+            # Check if any tracked files have changed or been deleted
             for file_path_str, stored_hash in stored_hashes.items():
                 file_path = Path(file_path_str)
 
@@ -722,6 +735,24 @@ class IndexingService:
                         return True  # File was modified
                 except Exception:
                     return True  # Error reading file
+
+            # Check for new untracked source files
+            codebase_path_obj = Path(codebase_path)
+            current_source_files = await self._discover_source_files(
+                codebase_path_obj,
+                languages=None,  # Auto-detect all languages
+                exclude_patterns=self.config.DEFAULT_EXCLUDE_PATTERNS,
+            )
+
+            # Convert to string paths for comparison
+            current_file_paths = {str(f) for f in current_source_files}
+            indexed_file_paths = set(stored_hashes.keys())
+
+            # If there are new source files not in the index, we need reindexing
+            new_files = current_file_paths - indexed_file_paths
+            if new_files:
+                logger.info(f"Found {len(new_files)} new untracked source files, reindexing needed")
+                return True
 
             return False
 

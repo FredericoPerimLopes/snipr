@@ -194,6 +194,83 @@ class TestIndexingService:
         assert needs_reindex
 
     @pytest.mark.asyncio
+    async def test_needs_reindexing_with_new_untracked_files(self, indexing_service, temp_codebase, mock_config):
+        """Test that needs_reindexing detects new untracked files."""
+
+        from ...models.indexing_models import CodeChunk
+
+        # Create initial index metadata with one file
+        initial_file = temp_codebase / "existing.py"
+        initial_file.write_text("def existing(): pass")
+
+        chunks = [
+            CodeChunk(
+                file_path=str(initial_file),
+                content="def existing(): pass",
+                start_line=1,
+                end_line=1,
+                language="python",
+                semantic_type="function_definition",
+            )
+        ]
+        await indexing_service._store_index_metadata(temp_codebase, chunks)
+
+        # Add a new source file that's not in the index
+        new_file = temp_codebase / "new_file.py"
+        new_file.write_text("def new_function(): pass")
+
+        # Should detect that reindexing is needed due to new file
+        needs_reindex = await indexing_service.needs_reindexing(str(temp_codebase))
+        assert needs_reindex
+
+    @pytest.mark.asyncio
+    async def test_needs_reindexing_no_new_files(self, indexing_service, temp_codebase, mock_config):
+        """Test that needs_reindexing returns False when no new files exist."""
+        from ...models.indexing_models import CodeChunk
+
+        # Get all existing source files in temp directory and index them all
+        current_source_files = await indexing_service._discover_source_files(
+            temp_codebase, None, indexing_service.config.DEFAULT_EXCLUDE_PATTERNS
+        )
+
+        # Create chunks for all discovered files
+        chunks = []
+        for file_path in current_source_files:
+            chunks.append(
+                CodeChunk(
+                    file_path=str(file_path),
+                    content=file_path.read_text(),
+                    start_line=1,
+                    end_line=len(file_path.read_text().split("\n")),
+                    language=indexing_service._detect_language(file_path),
+                    semantic_type="code_block",
+                )
+            )
+
+        await indexing_service._store_index_metadata(temp_codebase, chunks)
+
+        # No new files added, should not need reindexing
+        needs_reindex = await indexing_service.needs_reindexing(str(temp_codebase))
+        assert not needs_reindex
+
+    @pytest.mark.asyncio
+    async def test_needs_reindexing_detects_new_files_in_subdirs(self, indexing_service, temp_codebase, mock_config):
+        """Test that needs_reindexing detects new files in subdirectories."""
+
+        # Create initial empty index
+        await indexing_service._store_index_metadata(temp_codebase, [])
+
+        # Create nested directory structure with new files
+        subdir = temp_codebase / "subdir"
+        subdir.mkdir()
+        new_file = subdir / "nested.py"
+        new_file.write_text("class NewClass: pass")
+
+        # Should detect new file in subdirectory
+        needs_reindex = await indexing_service.needs_reindexing(str(temp_codebase))
+        assert needs_reindex
+
+    @pytest.mark.asyncio
     async def test_store_and_retrieve_metadata(self, indexing_service, temp_codebase, mock_config):
         """Test storing and retrieving index metadata."""
         from ...models.indexing_models import CodeChunk
