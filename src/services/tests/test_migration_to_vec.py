@@ -118,7 +118,6 @@ def legacy_db_with_data(temp_dirs):
 
 
 class TestEmbeddingsMigrator:
-
     def test_check_prerequisites_success(self, migrator_config, legacy_db_with_data):
         """Test successful prerequisites check."""
         with patch("src.services.migration_to_vec.get_settings") as mock_settings:
