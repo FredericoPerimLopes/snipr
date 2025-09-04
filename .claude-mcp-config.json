@@ -6,7 +6,8 @@
       "cwd": "/home/flopes/snipr",
       "env": {
         "INDEX_CACHE_DIR": ".index_cache",
-        "ENABLE_QUANTIZATION": "true"
+        "ENABLE_QUANTIZATION": "true",
+        "DEVICE": "cpu"
       }
     }
   }
