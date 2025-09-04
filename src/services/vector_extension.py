@@ -204,7 +204,7 @@ class VectorExtensionLoader:
 
             # Get vec tables
             cursor = conn.execute("""
-                SELECT name FROM sqlite_master 
+                SELECT name FROM sqlite_master
                 WHERE type='table' AND sql LIKE '%vec0%'
             """)
             info["vec_tables"] = [row[0] for row in cursor.fetchall()]

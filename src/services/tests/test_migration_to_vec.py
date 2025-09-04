@@ -90,8 +90,8 @@ class TestEmbeddingsMigrator:
             embedding_blob = json.dumps(embedding).encode()
             conn.execute(
                 """
-                INSERT INTO embeddings 
-                (file_path, content, start_line, end_line, language, semantic_type, 
+                INSERT INTO embeddings
+                (file_path, content, start_line, end_line, language, semantic_type,
                  embedding, content_hash, function_name)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
@@ -111,8 +111,8 @@ class TestEmbeddingsMigrator:
         # Insert one without embedding (should be skipped)
         conn.execute(
             """
-            INSERT INTO embeddings 
-            (file_path, content, start_line, end_line, language, semantic_type, 
+            INSERT INTO embeddings
+            (file_path, content, start_line, end_line, language, semantic_type,
              content_hash, function_name)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
@@ -259,7 +259,7 @@ class TestEmbeddingsMigrator:
         good_embedding = json.dumps([1.0, 2.0, 3.0]).encode()
         conn.execute(
             """
-            INSERT INTO embeddings 
+            INSERT INTO embeddings
             (file_path, content, start_line, end_line, language, semantic_type, embedding, content_hash)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
@@ -270,7 +270,7 @@ class TestEmbeddingsMigrator:
         bad_embedding = b"invalid_json"
         conn.execute(
             """
-            INSERT INTO embeddings 
+            INSERT INTO embeddings
             (file_path, content, start_line, end_line, language, semantic_type, embedding, content_hash)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
@@ -418,7 +418,7 @@ class TestMigrationEdgeCases:
         for i in range(3):
             conn.execute(
                 """
-                INSERT INTO embeddings 
+                INSERT INTO embeddings
                 (file_path, content, start_line, end_line, language, semantic_type, content_hash)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
@@ -484,8 +484,8 @@ class TestMigrationEdgeCases:
             embedding_blob = json.dumps(embedding).encode()
             conn.execute(
                 """
-                INSERT INTO embeddings 
-                (file_path, content, start_line, end_line, language, semantic_type, 
+                INSERT INTO embeddings
+                (file_path, content, start_line, end_line, language, semantic_type,
                  embedding, content_hash, function_name)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
