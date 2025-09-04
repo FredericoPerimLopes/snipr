@@ -549,6 +549,7 @@ class SearchService:
         """Remove embeddings for specific files from the database."""
         try:
             conn = sqlite3.connect(str(self.db_path))
+            self.vec_loader.load_extension(conn)
 
             # Delete embeddings for specified files
             placeholders = ",".join("?" * len(file_paths))
@@ -572,6 +573,7 @@ class SearchService:
         """Clear all embeddings from the database."""
         try:
             conn = sqlite3.connect(str(self.db_path))
+            self.vec_loader.load_extension(conn)
             # Clear both vec table and metadata table
             conn.execute("DELETE FROM embeddings_vec")
             conn.execute("DELETE FROM embeddings_vec_metadata")
