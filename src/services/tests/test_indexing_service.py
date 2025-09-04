@@ -1,4 +1,3 @@
-import json
 import shutil
 import tempfile
 from pathlib import Path
@@ -235,23 +234,8 @@ class TestIndexingService:
     @pytest.mark.asyncio
     async def test_store_and_retrieve_metadata(self, indexing_service, temp_codebase, mock_config):
         """Test storing and retrieving index metadata."""
-        from ...models.indexing_models import CodeChunk
-
-        # Create test chunks
-        chunks = [
-            CodeChunk(
-                file_path=str(temp_codebase / "test.py"),
-                content="def test(): pass",
-                start_line=1,
-                end_line=1,
-                language="python",
-                semantic_type="function_definition",
-            )
-        ]
-
         # Skip this test - _store_index_metadata no longer exists
         pytest.skip("Internal implementation changed")
-        assert "file_hashes" in metadata
 
     @pytest.mark.asyncio
     async def test_get_changed_files_no_previous_index(self, indexing_service, temp_codebase, mock_config):
@@ -280,8 +264,6 @@ class TestIndexingService:
     @pytest.mark.asyncio
     async def test_get_changed_files_with_modifications(self, indexing_service, temp_codebase, mock_config):
         """Test changed file detection with file modifications."""
-        from ...models.indexing_models import CodeChunk
-
         # Clean up any existing file records from previous tests
         file_records_path = mock_config.INDEX_CACHE_DIR / "file_records.json"
         if file_records_path.exists():
@@ -290,17 +272,6 @@ class TestIndexingService:
         # Also clear the update service's in-memory records
         indexing_service.update_service.file_records.clear()
 
-        # Create initial metadata
-        chunks = [
-            CodeChunk(
-                file_path=str(temp_codebase / "test.py"),
-                content="def test(): pass",
-                start_line=1,
-                end_line=1,
-                language="python",
-                semantic_type="function_definition",
-            )
-        ]
         # Skip this test - _store_index_metadata no longer exists
         pytest.skip("Internal implementation changed")
 

@@ -57,7 +57,9 @@ def mock_task_registry():
 
 class TestIndexCodebaseTool:
     @pytest.mark.asyncio
-    async def test_index_codebase_success(self, temp_codebase, mock_indexing_service, mock_search_service, mock_task_registry):
+    async def test_index_codebase_success(
+        self, temp_codebase, mock_indexing_service, mock_search_service, mock_task_registry
+    ):
         """Test successful codebase indexing."""
         # Setup mocks
         mock_indexing_service.needs_reindexing.return_value = True
@@ -105,7 +107,9 @@ class TestIndexCodebaseTool:
         assert "already up to date" in result["message"]
 
     @pytest.mark.asyncio
-    async def test_index_codebase_with_language_filter(self, temp_codebase, mock_indexing_service, mock_search_service, mock_task_registry):
+    async def test_index_codebase_with_language_filter(
+        self, temp_codebase, mock_indexing_service, mock_search_service, mock_task_registry
+    ):
         """Test indexing with language filtering."""
         # Setup mocks
         mock_indexing_service.needs_reindexing.return_value = True
@@ -188,7 +192,9 @@ class TestIndexCodebaseTool:
         assert not test_file.exists()
 
     @pytest.mark.asyncio
-    async def test_index_codebase_json_response_format(self, temp_codebase, mock_indexing_service, mock_search_service, mock_task_registry):
+    async def test_index_codebase_json_response_format(
+        self, temp_codebase, mock_indexing_service, mock_search_service, mock_task_registry
+    ):
         """Test that tool returns valid JSON string."""
         # Setup mocks
         mock_indexing_service.needs_reindexing.return_value = True
