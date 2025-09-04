@@ -134,6 +134,10 @@ EMBEDDING_MODEL="all-MiniLM-L6-v2"
 
 # Batch size for embedding generation
 EMBEDDING_BATCH_SIZE="32"
+
+# Device for model inference (cpu or cuda)
+# Default is cpu for better compatibility
+DEVICE="cpu"
 ```
 
 ### Performance Tuning
@@ -273,6 +277,20 @@ Reduce batch size for lower memory usage:
 
 ```bash
 export BATCH_SIZE="16"
+```
+
+### GPU/CUDA Issues
+
+The tool defaults to CPU mode for better compatibility. To use GPU:
+
+```bash
+export DEVICE="cuda"
+```
+
+To force CPU mode (default):
+
+```bash
+export DEVICE="cpu"
 ```
 
 ## Requirements

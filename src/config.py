@@ -12,6 +12,10 @@ class Config:
     _embedding_enabled_env = os.getenv("EMBEDDING_ENABLED", "true").lower()
     EMBEDDING_ENABLED: bool = _embedding_enabled_env == "true"
     EMBEDDING_BATCH_SIZE: int = int(os.getenv("EMBEDDING_BATCH_SIZE", "32"))
+    
+    # Device configuration (cpu or cuda)
+    # Default to CPU for better compatibility
+    DEVICE: str = os.getenv("DEVICE", "cpu").lower()
 
     # Search performance configuration
     MAX_FILE_SIZE_MB: int = int(os.getenv("MAX_FILE_SIZE_MB", "10"))

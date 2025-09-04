@@ -45,8 +45,10 @@ class SearchService:
             return
 
         try:
-            self.model = SentenceTransformer(self.config.EMBEDDING_MODEL)
-            logger.info(f"Initialized embedding model: {self.config.EMBEDDING_MODEL}")
+            # Initialize with specified device (cpu or cuda)
+            device = self.config.DEVICE
+            self.model = SentenceTransformer(self.config.EMBEDDING_MODEL, device=device)
+            logger.info(f"Initialized embedding model: {self.config.EMBEDDING_MODEL} on device: {device}")
         except Exception as e:
             logger.error(f"Failed to initialize embedding model: {e}")
             self.model = None
