@@ -88,7 +88,7 @@ class MetadataSearchEngine:
                        function_signature, class_name, function_name, parameter_types, return_type,
                        inheritance_chain, import_statements, docstring, complexity_score,
                        dependencies, interfaces, decorators
-                FROM embeddings
+                FROM embeddings_vec_metadata
                 WHERE {" AND ".join(where_clauses)}
                 ORDER BY complexity_score ASC
                 LIMIT ?
@@ -153,7 +153,7 @@ class MetadataSearchEngine:
                        function_signature, class_name, function_name, parameter_types, return_type,
                        inheritance_chain, import_statements, docstring, complexity_score,
                        dependencies, interfaces, decorators
-                FROM embeddings
+                FROM embeddings_vec_metadata
                 WHERE {" AND ".join(where_clauses)}
                 LIMIT ?
             """
@@ -204,7 +204,7 @@ class MetadataSearchEngine:
                        function_signature, class_name, function_name, parameter_types, return_type,
                        inheritance_chain, import_statements, docstring, complexity_score,
                        dependencies, interfaces, decorators
-                FROM embeddings
+                FROM embeddings_vec_metadata
                 WHERE {" AND ".join(where_clauses) if where_clauses else "1=1"}
                 LIMIT ?
             """
@@ -252,7 +252,7 @@ class MetadataSearchEngine:
                        function_signature, class_name, function_name, parameter_types, return_type,
                        inheritance_chain, import_statements, docstring, complexity_score,
                        dependencies, interfaces, decorators
-                FROM embeddings
+                FROM embeddings_vec_metadata
                 WHERE {where_clause}
                 ORDER BY
                     CASE
@@ -386,7 +386,7 @@ class MetadataSearchEngine:
                        function_signature, class_name, function_name, parameter_types, return_type,
                        inheritance_chain, import_statements, docstring, complexity_score,
                        dependencies, interfaces, decorators
-                FROM embeddings
+                FROM embeddings_vec_metadata
                 WHERE {" AND ".join(where_clauses)}
                 ORDER BY complexity_score DESC
                 LIMIT 50
@@ -440,7 +440,7 @@ class MetadataSearchEngine:
                        function_signature, class_name, function_name, parameter_types, return_type,
                        inheritance_chain, import_statements, docstring, complexity_score,
                        dependencies, interfaces, decorators
-                FROM embeddings
+                FROM embeddings_vec_metadata
                 WHERE {" AND ".join(where_clauses)}
                 LIMIT 50
             """
@@ -487,7 +487,7 @@ class MetadataSearchEngine:
 
             query = f"""
                 SELECT class_name, inheritance_chain, interfaces
-                FROM embeddings
+                FROM embeddings_vec_metadata
                 WHERE {" AND ".join(where_clauses)}
                 AND semantic_type IN ('class_definition', 'class_declaration')
                 LIMIT 1
@@ -530,7 +530,7 @@ class MetadataSearchEngine:
             cursor = conn.execute(
                 """
                 SELECT import_statements, dependencies, function_name, class_name
-                FROM embeddings
+                FROM embeddings_vec_metadata
                 WHERE file_path = ?
                 """,
                 (file_path,),

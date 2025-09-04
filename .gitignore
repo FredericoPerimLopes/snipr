@@ -20,6 +20,9 @@ wheels/
 .installed.cfg
 *.egg
 MANIFEST
+.venv/
+venv/
+env/
 
 # Testing
 .coverage
@@ -52,4 +55,6 @@ Thumbs.db
 temp/
 tmp/
 .mypy_cache/
-<Mock name='get_settings().VECTOR_DB_PATH' id='128511583712784'>
+.index_cache/
+.ruff_cache/
+.pyre/

@@ -15,7 +15,6 @@ except ImportError:
 from ..config import get_settings
 from ..models.indexing_models import CodeChunk, SearchRequest, SearchResponse
 from .bm25_search import BM25SearchEngine
-from .db_migration import DatabaseMigration
 from .vector_extension import VectorExtensionLoader, VectorOperations
 
 logger = logging.getLogger(__name__)
@@ -47,7 +46,7 @@ class SearchService:
         try:
             # Initialize with specified device (cpu or cuda)
             device = self.config.DEVICE
-            self.model = SentenceTransformer(self.config.EMBEDDING_MODEL, device=device)
+            self.model = SentenceTransformer(self.config.EMBEDDING_MODEL, device=device, trust_remote_code=True)
             logger.info(f"Initialized embedding model: {self.config.EMBEDDING_MODEL} on device: {device}")
         except Exception as e:
             logger.error(f"Failed to initialize embedding model: {e}")
@@ -86,75 +85,12 @@ class SearchService:
 
             conn.close()
 
-            # Initialize legacy database for migration compatibility
-            # Run database migration first
-            migration = DatabaseMigration()
-            import asyncio
-
-            # Properly handle async migration in sync context
-            try:
-                # Try to get the running loop
-                loop = asyncio.get_running_loop()
-                # Schedule the migration as a task (fire and forget)
-                asyncio.create_task(migration.migrate_to_metadata_schema())
-            except RuntimeError:
-                # No running loop, run synchronously
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                loop.run_until_complete(migration.migrate_to_metadata_schema())
-
-            # Initialize legacy database for migration compatibility
-            legacy_db_path = self.config.INDEX_CACHE_DIR / "embeddings.db"
-            legacy_conn = sqlite3.connect(str(legacy_db_path))
-
-            # Create embeddings table with metadata fields
-            legacy_conn.execute("""
-                    CREATE TABLE IF NOT EXISTS embeddings (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        file_path TEXT NOT NULL,
-                        content TEXT NOT NULL,
-                        start_line INTEGER NOT NULL,
-                        end_line INTEGER NOT NULL,
-                        language TEXT NOT NULL,
-                        semantic_type TEXT NOT NULL,
-                        embedding BLOB,
-                        content_hash TEXT NOT NULL,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        function_signature TEXT,
-                        class_name TEXT,
-                        function_name TEXT,
-                        parameter_types TEXT,
-                        return_type TEXT,
-                        inheritance_chain TEXT,
-                        import_statements TEXT,
-                        docstring TEXT,
-                        complexity_score INTEGER,
-                        dependencies TEXT,
-                        interfaces TEXT,
-                        decorators TEXT,
-                        UNIQUE(file_path, start_line, end_line)
-                    )
-                """)
-
-            # Create indexes for performance
-            legacy_conn.execute("CREATE INDEX IF NOT EXISTS idx_language ON embeddings(language)")
-            legacy_conn.execute("CREATE INDEX IF NOT EXISTS idx_semantic_type ON embeddings(semantic_type)")
-            legacy_conn.execute("CREATE INDEX IF NOT EXISTS idx_file_path ON embeddings(file_path)")
-            legacy_conn.execute("CREATE INDEX IF NOT EXISTS idx_content_hash ON embeddings(content_hash)")
-            legacy_conn.execute("CREATE INDEX IF NOT EXISTS idx_function_name ON embeddings(function_name)")
-            legacy_conn.execute("CREATE INDEX IF NOT EXISTS idx_class_name ON embeddings(class_name)")
-            legacy_conn.execute("CREATE INDEX IF NOT EXISTS idx_complexity ON embeddings(complexity_score)")
-            legacy_conn.execute("CREATE INDEX IF NOT EXISTS idx_return_type ON embeddings(return_type)")
-
-            legacy_conn.commit()
-            legacy_conn.close()
-
-            logger.info(f"Initialized legacy database at {legacy_db_path}")
+            logger.info("Vector database initialization completed")
 
         except Exception as e:
             logger.error(f"Failed to initialize vector database: {e}")
 
-    async def embed_code_chunks(self, chunks: list[CodeChunk]) -> list[CodeChunk]:
+    async def embed_code_chunks(self, chunks: list[CodeChunk], indexing_logger=None) -> list[CodeChunk]:
         """Generate embeddings for code chunks and store in database."""
         if self.model is None:
             logger.warning("No embedding model available")
@@ -164,21 +100,53 @@ class SearchService:
         embedded_chunks = []
 
         try:
+            logger.info(f"Starting embedding generation for {len(chunks)} chunks")
+            if indexing_logger:
+                indexing_logger.log_info(f"Starting embedding generation for {len(chunks)} chunks")
+
             # Prepare content for embedding
             texts = [f"{chunk.semantic_type}: {chunk.content}" for chunk in chunks]
+            logger.info(f"Prepared {len(texts)} texts for embedding")
+            if indexing_logger:
+                indexing_logger.log_info(f"Prepared {len(texts)} texts for embedding")
 
             # Generate embeddings in batches
             batch_size = self.config.EMBEDDING_BATCH_SIZE
+            total_batches = (len(texts) + batch_size - 1) // batch_size
+            logger.info(f"Processing {total_batches} batches of size {batch_size}")
+            if indexing_logger:
+                indexing_logger.log_info(f"Processing {total_batches} batches of size {batch_size}")
+
             for i in range(0, len(texts), batch_size):
+                batch_num = i // batch_size + 1
                 batch_texts = texts[i : i + batch_size]
                 batch_chunks = chunks[i : i + batch_size]
+
+                logger.info(f"Processing batch {batch_num}/{total_batches} ({len(batch_texts)} chunks)")
+                if indexing_logger:
+                    indexing_logger.log_info(
+                        f"Processing embedding batch {batch_num}/{total_batches}", batch_size=len(batch_texts)
+                    )
+                batch_start = time.time()
 
                 # Generate embeddings
                 embeddings = self.model.encode(batch_texts, normalize_embeddings=True, show_progress_bar=False)
 
+                encode_time = (time.time() - batch_start) * 1000
+                logger.info(f"Batch {batch_num} encoding completed in {encode_time:.1f}ms")
+                if indexing_logger:
+                    indexing_logger.log_info(f"Batch {batch_num} encoding completed", encoding_time_ms=encode_time)
+
                 # Quantize embeddings if enabled
                 if self.config.ENABLE_QUANTIZATION:
+                    quant_start = time.time()
                     embeddings = self._quantize_embeddings(embeddings)
+                    quant_time = (time.time() - quant_start) * 1000
+                    logger.info(f"Batch {batch_num} quantization completed in {quant_time:.1f}ms")
+                    if indexing_logger:
+                        indexing_logger.log_info(
+                            f"Batch {batch_num} quantization completed", quantization_time_ms=quant_time
+                        )
 
                 # Update chunks with embeddings
                 for chunk, embedding in zip(batch_chunks, embeddings, strict=False):
@@ -186,13 +154,40 @@ class SearchService:
                     embedded_chunks.append(chunk)
 
                 # Store in database
+                store_start = time.time()
                 await self._store_embeddings_batch(batch_chunks)
+                store_time = (time.time() - store_start) * 1000
+
+                batch_total_time = (time.time() - batch_start) * 1000
+                logger.info(
+                    f"Batch {batch_num} storage completed in {store_time:.1f}ms (total: {batch_total_time:.1f}ms)"
+                )
+                if indexing_logger:
+                    indexing_logger.log_info(
+                        f"Batch {batch_num} storage completed",
+                        storage_time_ms=store_time,
+                        total_batch_time_ms=batch_total_time,
+                    )
 
             # Build BM25 index for all chunks
+            logger.info("Building BM25 index for all embedded chunks")
+            if indexing_logger:
+                indexing_logger.log_info("Building BM25 index for all embedded chunks")
+            bm25_start = time.time()
             await self.bm25_engine.build_index(embedded_chunks)
+            bm25_time = (time.time() - bm25_start) * 1000
+            logger.info(f"BM25 index building completed in {bm25_time:.1f}ms")
+            if indexing_logger:
+                indexing_logger.log_info("BM25 index building completed", bm25_build_time_ms=bm25_time)
 
             processing_time = (time.time() - start_time) * 1000
             logger.info(f"Generated embeddings for {len(chunks)} chunks in {processing_time:.1f}ms")
+            if indexing_logger:
+                indexing_logger.log_info(
+                    "Complete embedding generation finished",
+                    total_chunks=len(embedded_chunks),
+                    total_processing_time_ms=processing_time,
+                )
 
             return embedded_chunks
 
@@ -313,10 +308,13 @@ class SearchService:
             )
 
             chunks = []
-            for _rowid, _distance, metadata in results:
+            for _rowid, distance, metadata in results:
                 # Apply language filter if specified
                 if language_filter and metadata.get("language") != language_filter:
                     continue
+
+                # Convert distance back to similarity score (0 distance = 1.0 similarity)
+                similarity = 1.0 - distance
 
                 # Deserialize JSON metadata fields
                 parameter_types = json.loads(metadata["parameter_types"]) if metadata["parameter_types"] else None
@@ -334,6 +332,7 @@ class SearchService:
                     language=metadata["language"],
                     semantic_type=metadata["semantic_type"],
                     embedding=None,  # Don't return embedding data for search results
+                    similarity=round(similarity, 3),
                     function_signature=metadata["function_signature"],
                     class_name=metadata["class_name"],
                     function_name=metadata["function_name"],
