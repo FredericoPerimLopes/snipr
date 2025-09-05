@@ -20,7 +20,31 @@ class DatabaseMigration:
         try:
             conn = sqlite3.connect(str(self.db_path))
 
-            # Check if metadata columns already exist
+            # Check if we have the new vector schema (embeddings_vec_metadata table)
+            cursor = conn.execute("""
+                SELECT name FROM sqlite_master
+                WHERE type='table' AND name='embeddings_vec_metadata'
+            """)
+            new_schema_exists = cursor.fetchone() is not None
+
+            if new_schema_exists:
+                logger.info("New vector schema already exists - skipping migration")
+                conn.close()
+                return True
+
+            # Check if old embeddings table exists for migration
+            cursor = conn.execute("""
+                SELECT name FROM sqlite_master
+                WHERE type='table' AND name='embeddings'
+            """)
+            old_table_exists = cursor.fetchone() is not None
+
+            if not old_table_exists:
+                logger.info("No old table to migrate - migration complete")
+                conn.close()
+                return True
+
+            # Check if metadata columns already exist in old table
             cursor = conn.execute("PRAGMA table_info(embeddings)")
             columns = [row[1] for row in cursor.fetchall()]
 

@@ -11,7 +11,7 @@ class Config:
     EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "jinaai/jina-embeddings-v2-base-code")
     _embedding_enabled_env = os.getenv("EMBEDDING_ENABLED", "true").lower()
     EMBEDDING_ENABLED: bool = _embedding_enabled_env == "true"
-    EMBEDDING_BATCH_SIZE: int = int(os.getenv("EMBEDDING_BATCH_SIZE", "32"))
+    EMBEDDING_BATCH_SIZE: int = int(os.getenv("EMBEDDING_BATCH_SIZE", "16"))
 
     # Device configuration (cpu or cuda)
     # Default to CPU for better compatibility
@@ -52,17 +52,21 @@ class Config:
     # Performance optimization
     _quantization_env = os.getenv("ENABLE_QUANTIZATION", "true").lower()
     ENABLE_QUANTIZATION: bool = _quantization_env == "true"
-    BATCH_SIZE: int = int(os.getenv("BATCH_SIZE", "100"))
+    BATCH_SIZE: int = int(os.getenv("BATCH_SIZE", "50"))
 
     # Incremental update configuration
     ENABLE_INCREMENTAL_UPDATES: bool = os.getenv("ENABLE_INCREMENTAL_UPDATES", "true").lower() == "true"
     AUTO_SYNC_ON_SEARCH: bool = os.getenv("AUTO_SYNC_ON_SEARCH", "true").lower() == "true"
-    MAX_FILES_PER_BATCH: int = int(os.getenv("MAX_FILES_PER_BATCH", "100"))
+    MAX_FILES_PER_BATCH: int = int(os.getenv("MAX_FILES_PER_BATCH", "50"))
     DEPENDENCY_GRAPH_ENABLED: bool = os.getenv("DEPENDENCY_GRAPH_ENABLED", "true").lower() == "true"
 
     # Memory management
     MAX_MEMORY_MB: int = int(os.getenv("MAX_MEMORY_MB", "4096"))
     CHUNK_CACHE_SIZE: int = int(os.getenv("CHUNK_CACHE_SIZE", "10000"))
+
+    # Logging configuration
+    ENABLE_INDEXING_LOGS: bool = os.getenv("ENABLE_INDEXING_LOGS", "true").lower() == "true"
+    INDEXING_LOG_LEVEL: str = os.getenv("INDEXING_LOG_LEVEL", "INFO").upper()
 
     # Exclude patterns for indexing
     DEFAULT_EXCLUDE_PATTERNS: ClassVar[list[str]] = [

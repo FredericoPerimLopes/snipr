@@ -244,6 +244,23 @@ class VectorOperations:
             The rowid of the inserted record or None if failed
         """
         try:
+            # Check if this embedding already exists based on unique constraint
+            metadata_table = f"{table_name}_metadata"
+            file_path = metadata.get("file_path")
+            start_line = metadata.get("start_line")
+            end_line = metadata.get("end_line")
+
+            # Check for existing record
+            cursor = conn.execute(
+                f"SELECT rowid FROM {metadata_table} WHERE file_path = ? AND start_line = ? AND end_line = ?",
+                (file_path, start_line, end_line),
+            )
+            existing_row = cursor.fetchone()
+
+            if existing_row:
+                # Record already exists, return existing rowid
+                return existing_row[0]
+
             # Convert embedding to bytes format for sqlite-vec
             import struct
 
@@ -253,16 +270,15 @@ class VectorOperations:
             cursor = conn.execute(f"INSERT INTO {table_name}(embedding) VALUES (?)", (embedding_bytes,))
             rowid = cursor.lastrowid
 
-            # Insert metadata
-            metadata_table = f"{table_name}_metadata"
-            metadata["rowid"] = rowid
-
+            # Insert metadata with explicit rowid to link to vector table
             columns = list(metadata.keys())
             placeholders = ",".join(["?" for _ in columns])
             columns_str = ",".join(columns)
 
+            # Use INSERT OR REPLACE to handle duplicates based on UNIQUE constraint
             conn.execute(
-                f"INSERT INTO {metadata_table} ({columns_str}) VALUES ({placeholders})", list(metadata.values())
+                f"INSERT OR REPLACE INTO {metadata_table} (rowid, {columns_str}) VALUES (?, {placeholders})",
+                [rowid] + list(metadata.values()),
             )
 
             return rowid

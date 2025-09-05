@@ -17,7 +17,7 @@ except ImportError:
     sys.exit(1)
 
 # Import tools
-from .tools.index_codebase import clear_index, get_indexing_status, index_codebase
+from .tools.index_codebase import cancel_indexing_task, clear_index, get_indexing_status, index_codebase
 from .tools.search_code import (
     get_search_stats,
     search_by_type,
@@ -51,6 +51,12 @@ async def get_indexing_status_tool(codebase_path: str) -> str:
 async def clear_index_tool() -> str:
     """Clear all indexing data and start fresh."""
     return await clear_index()
+
+
+@app.tool()
+async def cancel_indexing_task_tool(task_id: str) -> str:
+    """Cancel an active indexing task."""
+    return await cancel_indexing_task(task_id)
 
 
 # Register search tools

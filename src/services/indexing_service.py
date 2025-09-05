@@ -1,5 +1,4 @@
-import hashlib
-import json
+import asyncio
 import logging
 import os
 import time
@@ -46,11 +45,11 @@ except ImportError:
 from ..config import get_settings, validate_codebase_path
 from ..models.indexing_models import (
     CodeChunk,
-    FileUpdateRecord,
     IndexingRequest,
     IndexingResponse,
     IndexingStatus,
 )
+from .logging_service import create_indexing_logger
 from .metadata_extractor import MetadataExtractor
 from .syntactic_chunker import SyntacticChunker
 from .update_service import IncrementalUpdateService
@@ -121,33 +120,64 @@ class IndexingService:
         """Index codebase with smart incremental updates using git-aware change detection."""
         start_time = time.time()
 
+        # Initialize indexing logger
+        indexing_logger = create_indexing_logger()
+        indexing_logger.log_phase_start("INDEXING_START", codebase_path=request.codebase_path)
+
         # Validate codebase path
         codebase_path = validate_codebase_path(request.codebase_path)
+        indexing_logger.log_info("Codebase path validated", path=str(codebase_path))
 
         # Check if this is initial indexing or incremental update
-        metadata_path = self.config.INDEX_CACHE_DIR / "index_metadata.json"
-        is_initial_indexing = not metadata_path.exists()
+        indexing_logger.log_phase_start("DATABASE_CHECK")
+        import sqlite3
+
+        conn = sqlite3.connect(str(self.config.VECTOR_DB_PATH))
+        try:
+            cursor = conn.execute("SELECT COUNT(*) FROM embeddings_vec_metadata")
+            existing_chunks = cursor.fetchone()[0] or 0
+        except sqlite3.OperationalError:
+            # Table doesn't exist yet, this is definitely initial indexing
+            existing_chunks = 0
+        finally:
+            conn.close()
+
+        is_initial_indexing = existing_chunks == 0
+        indexing_logger.log_phase_end(
+            "DATABASE_CHECK", 0.0, existing_chunks=existing_chunks, initial_indexing=is_initial_indexing
+        )
 
         if is_initial_indexing:
             # Initial indexing: process all source files
+            indexing_logger.log_phase_start("FILE_DISCOVERY", indexing_type="initial")
             logger.info("Performing initial full codebase indexing")
             all_source_files = await self._discover_source_files(
                 codebase_path, request.languages, request.exclude_patterns or []
             )
             files_to_process = all_source_files
             modified_files, new_files, deleted_files = [], [str(f) for f in all_source_files], []
+            indexing_logger.update_metric("files_discovered", len(all_source_files))
+            indexing_logger.log_phase_end("FILE_DISCOVERY", 0.0, files_found=len(all_source_files))
         else:
             # Incremental indexing: use enhanced change detection
+            indexing_logger.log_phase_start("CHANGE_DETECTION", indexing_type="incremental")
             modified_files, new_files, deleted_files = await self.update_service.detect_changes(str(codebase_path))
             files_to_process = [Path(f) for f in modified_files + new_files]
+            indexing_logger.update_metric("files_discovered", len(files_to_process))
+            indexing_logger.log_phase_end(
+                "CHANGE_DETECTION", 0.0, modified=len(modified_files), new=len(new_files), deleted=len(deleted_files)
+            )
 
         total_changed_files = len(files_to_process) + len(deleted_files)
 
         if total_changed_files == 0:
+            indexing_logger.log_info("No file changes detected, skipping indexing")
             logger.info("No file changes detected, skipping indexing")
 
             # Get current status for response
             status = await self.get_indexing_status(str(codebase_path))
+            indexing_logger.log_session_summary(result="up_to_date", total_chunks=status.total_chunks)
+            indexing_logger.close()
             return IndexingResponse(
                 indexed_files=0,
                 total_chunks=status.total_chunks,
@@ -156,6 +186,9 @@ class IndexingService:
                 status="up_to_date",
             )
 
+        indexing_logger.log_info(
+            "Starting file processing", modified=len(modified_files), new=len(new_files), deleted=len(deleted_files)
+        )
         logger.info(
             f"Incremental indexing: {len(modified_files)} modified, {len(new_files)} new, "
             f"{len(deleted_files)} deleted files"
@@ -169,25 +202,49 @@ class IndexingService:
         # Clean up deleted and modified files from database
         files_to_remove = deleted_files + modified_files
         if files_to_remove:
+            indexing_logger.log_phase_start("DATABASE_CLEANUP")
+            cleanup_start = time.time()
             await search_service.remove_file_embeddings(files_to_remove)
+            cleanup_time = (time.time() - cleanup_start) * 1000
+            indexing_logger.log_phase_end("DATABASE_CLEANUP", cleanup_time, files_removed=len(files_to_remove))
 
         # Parse only changed files
+        indexing_logger.log_phase_start("FILE_PARSING", total_files=len(files_to_process))
         all_chunks: list[CodeChunk] = []
         languages_detected: set[str] = set()
 
-        for file_path in files_to_process:
+        for i, file_path in enumerate(files_to_process, 1):
+            file_start_time = time.time()
             try:
                 chunks = await self._parse_file(file_path)
+                file_processing_time = (time.time() - file_start_time) * 1000
+
                 all_chunks.extend(chunks)
                 languages_detected.update(chunk.language for chunk in chunks)
+
+                # Log file processing success
+                language = self._detect_language(file_path)
+                indexing_logger.log_file_processed(
+                    str(file_path), len(chunks), file_processing_time, language, progress=f"{i}/{len(files_to_process)}"
+                )
             except Exception as e:
+                file_processing_time = (time.time() - file_start_time) * 1000
+                indexing_logger.log_file_failed(str(file_path), e, processing_time_ms=file_processing_time)
                 logger.warning(f"Failed to parse {file_path}: {e}")
                 continue
 
+        indexing_logger.log_phase_end(
+            "FILE_PARSING", 0.0, total_chunks=len(all_chunks), languages=list(languages_detected)
+        )
+
         # Generate and store embeddings for new chunks
         if all_chunks:
+            indexing_logger.log_phase_start("EMBEDDING_GENERATION", chunk_count=len(all_chunks))
+            embedding_start = time.time()
             logger.info(f"Generating embeddings for {len(all_chunks)} chunks...")
-            embedded_chunks = await search_service.embed_code_chunks(all_chunks)
+            embedded_chunks = await search_service.embed_code_chunks(all_chunks, indexing_logger)
+            embedding_time = (time.time() - embedding_start) * 1000
+            indexing_logger.log_phase_end("EMBEDDING_GENERATION", embedding_time, chunks_embedded=len(embedded_chunks))
             logger.info(f"Successfully generated embeddings for {len(embedded_chunks)} chunks")
 
             # Update file records for processed files
@@ -208,13 +265,23 @@ class IndexingService:
                 )
 
         # Build dependency graph for future incremental updates
+        indexing_logger.log_phase_start("DEPENDENCY_GRAPH")
+        dep_start = time.time()
         await self.update_service.build_dependency_graph(str(codebase_path))
-
-        # Update index metadata with new file hashes
-        deleted_files_paths = [Path(f) for f in deleted_files]
-        await self._update_index_metadata(codebase_path, files_to_process, deleted_files_paths)
+        dep_time = (time.time() - dep_start) * 1000
+        indexing_logger.log_phase_end("DEPENDENCY_GRAPH", dep_time)
 
         processing_time = (time.time() - start_time) * 1000
+
+        # Log final session summary
+        indexing_logger.log_session_summary(
+            result="success",
+            indexed_files=len(files_to_process),
+            total_chunks=len(all_chunks),
+            total_time_ms=processing_time,
+            languages=list(languages_detected),
+        )
+        indexing_logger.close()
 
         return IndexingResponse(
             indexed_files=len(files_to_process),
@@ -223,6 +290,275 @@ class IndexingService:
             languages_detected=list(languages_detected),
             status="success",
         )
+
+    async def index_codebase_with_progress(self, request: IndexingRequest, task) -> IndexingResponse:
+        """Index codebase with progress tracking for async operations."""
+        from ..services.logging_service import create_indexing_logger
+        from .task_registry import task_registry
+
+        start_time = time.time()
+
+        # Create indexing logger (will be no-op if logging disabled)
+        indexing_logger = create_indexing_logger(f"progress_{task.task_id}")
+
+        try:
+            indexing_logger.log_info("=== PROGRESS-BASED INDEXING SESSION STARTED ===")
+            indexing_logger.log_info("Validating codebase path", codebase_path=request.codebase_path)
+
+            # Validate codebase path
+            from ..config import validate_codebase_path
+
+            codebase_path = validate_codebase_path(request.codebase_path)
+
+            # Phase 1: Database Status Check
+            indexing_logger.log_info("Phase 1: Checking database status")
+
+            # Check if this is initial indexing or incremental update
+            # Use vector database to determine if initial indexing is needed
+            import sqlite3
+
+            conn = sqlite3.connect(str(self.config.VECTOR_DB_PATH))
+            try:
+                cursor = conn.execute("SELECT COUNT(*) FROM embeddings_vec_metadata")
+                existing_chunks = cursor.fetchone()[0] or 0
+            except sqlite3.OperationalError:
+                # Table doesn't exist yet, this is definitely initial indexing
+                existing_chunks = 0
+            finally:
+                conn.close()
+            is_initial_indexing = existing_chunks == 0
+
+            indexing_logger.log_info(
+                "Database check complete", existing_chunks=existing_chunks, is_initial_indexing=is_initial_indexing
+            )
+
+            if is_initial_indexing:
+                # Phase 2: File Discovery (Initial)
+                indexing_logger.log_info("Phase 2: Discovering source files (initial indexing)")
+                logger.info("Performing initial full codebase indexing")
+
+                all_source_files = await self._discover_source_files(
+                    codebase_path, request.languages, request.exclude_patterns or []
+                )
+                files_to_process = all_source_files
+                modified_files, new_files, deleted_files = [], [str(f) for f in all_source_files], []
+
+                indexing_logger.log_info("File discovery complete", total_discovered_files=len(all_source_files))
+            else:
+                # Phase 2: Change Detection (Incremental)
+                indexing_logger.log_info("Phase 2: Detecting file changes (incremental indexing)")
+
+                # Incremental indexing: use enhanced change detection
+                modified_files, new_files, deleted_files = await self.update_service.detect_changes(str(codebase_path))
+                files_to_process = [Path(f) for f in modified_files + new_files]
+
+                indexing_logger.log_info(
+                    "Change detection complete",
+                    modified_files=len(modified_files),
+                    new_files=len(new_files),
+                    deleted_files=len(deleted_files),
+                )
+
+            # Update task progress with total files
+            task.progress.total_files = len(files_to_process)
+            task_registry.update_task(task)
+
+            # Phase 3: Processing Validation
+            indexing_logger.log_info("Phase 3: Validating files to process")
+
+            total_changed_files = len(files_to_process) + len(deleted_files)
+
+            if total_changed_files == 0:
+                indexing_logger.log_info("No changes detected, skipping indexing")
+                logger.info("No file changes detected, skipping indexing")
+                status = await self.get_indexing_status(str(codebase_path))
+                return IndexingResponse(
+                    indexed_files=0,
+                    total_chunks=status.total_chunks,
+                    processing_time_ms=0.0,
+                    languages_detected=[],
+                    status="up_to_date",
+                )
+
+            indexing_logger.log_info(
+                "Files validated for processing",
+                files_to_process=len(files_to_process),
+                files_to_remove=len(deleted_files + modified_files),
+            )
+
+            logger.info(f"Processing {len(files_to_process)} files with progress tracking")
+
+            # Phase 4: Database Cleanup
+            indexing_logger.log_info("Phase 4: Cleaning up database for modified/deleted files")
+
+            # Import SearchService for database cleanup
+            from .search_service import SearchService
+
+            search_service = SearchService()
+
+            # Clean up deleted and modified files from database
+            files_to_remove = deleted_files + modified_files
+            if files_to_remove:
+                cleanup_start = time.time()
+                await search_service.remove_file_embeddings(files_to_remove)
+                cleanup_time = (time.time() - cleanup_start) * 1000
+                indexing_logger.log_info(
+                    "Database cleanup complete", files_removed=len(files_to_remove), cleanup_time_ms=cleanup_time
+                )
+
+            # Phase 5: File Processing Setup
+            indexing_logger.log_info("Phase 5: Setting up file processing", total_files=len(files_to_process))
+
+            # Process files with concurrency control and progress tracking
+            all_chunks = []
+            languages_detected = set()
+            failed_files = []
+
+            # Create semaphore for concurrent file processing
+            max_concurrent = min(self.config.MAX_FILES_PER_BATCH // 4, 10)  # Conservative concurrency
+            semaphore = asyncio.Semaphore(max_concurrent)
+
+            async def process_file_with_progress(file_path: Path, index: int) -> list:
+                """Process a single file with progress tracking."""
+                async with semaphore:
+                    file_start_time = time.time()
+                    try:
+                        # Update progress
+                        task.progress.files_processed = index
+                        task.progress.current_file = str(file_path)
+                        task_registry.update_task(task)
+
+                        chunks = await self._parse_file(file_path)
+                        file_time = (time.time() - file_start_time) * 1000
+
+                        if index % 10 == 0:  # Log every 10 files
+                            logger.info(f"Processed {index}/{len(files_to_process)} files")
+                            indexing_logger.log_info(
+                                f"Progress checkpoint: {index}/{len(files_to_process)} files processed"
+                            )
+
+                        indexing_logger.log_info(
+                            "File processed successfully",
+                            file_path=str(file_path),
+                            chunks_created=len(chunks),
+                            processing_time_ms=file_time,
+                        )
+                        return chunks
+                    except Exception as e:
+                        file_time = (time.time() - file_start_time) * 1000
+                        logger.warning(f"Failed to parse {file_path}: {e}")
+                        indexing_logger.log_warning(
+                            "File processing failed",
+                            file_path=str(file_path),
+                            error=str(e),
+                            processing_time_ms=file_time,
+                        )
+                        failed_files.append(str(file_path))
+                        return []
+
+            # Phase 6: Concurrent File Processing
+            indexing_logger.log_info("Phase 6: Processing files concurrently", max_concurrent=max_concurrent)
+
+            processing_start = time.time()
+
+            # Process files concurrently
+            tasks_list = [process_file_with_progress(file_path, i) for i, file_path in enumerate(files_to_process, 1)]
+
+            file_chunks_results = await asyncio.gather(*tasks_list, return_exceptions=True)
+
+            # Collect results
+            for chunks_result in file_chunks_results:
+                if isinstance(chunks_result, list):
+                    all_chunks.extend(chunks_result)
+                    languages_detected.update(chunk.language for chunk in chunks_result)
+                    task.progress.chunks_created = len(all_chunks)
+                    task_registry.update_task(task)
+
+            processing_time = (time.time() - processing_start) * 1000
+            indexing_logger.log_info(
+                "File processing complete",
+                successful_files=len(files_to_process) - len(failed_files),
+                failed_files=len(failed_files),
+                total_chunks=len(all_chunks),
+                processing_time_ms=processing_time,
+            )
+
+            # Phase 7: Embedding Generation
+            if all_chunks:
+                indexing_logger.log_info("Phase 7: Generating embeddings", chunks_to_embed=len(all_chunks))
+                embedding_start = time.time()
+
+                logger.info(f"Generating embeddings for {len(all_chunks)} chunks...")
+                indexing_logger.log_info(f"Starting batch embedding generation for {len(all_chunks)} chunks")
+
+                embedded_chunks = await search_service.embed_code_chunks(all_chunks, indexing_logger)
+                embedding_time = (time.time() - embedding_start) * 1000
+
+                logger.info(f"Successfully generated embeddings for {len(embedded_chunks)} chunks")
+                indexing_logger.log_info(
+                    "Embedding generation complete",
+                    embedded_chunks=len(embedded_chunks),
+                    embedding_time_ms=embedding_time,
+                )
+            else:
+                embedded_chunks = []
+                indexing_logger.log_info("No chunks to embed, skipping embedding generation")
+
+            # Phase 8: Database Storage
+            indexing_logger.log_info("Phase 8: Storing embeddings in database")
+
+            # Update file records for processed files
+            for file_path in files_to_process:
+                file_path_str = str(file_path)
+                file_chunks = [c for c in embedded_chunks if c.file_path == file_path_str]
+                chunk_ids = [f"{c.file_path}:{c.start_line}" for c in file_chunks]
+                content_hash = self.update_service.calculate_file_hash(file_path_str)
+                dependencies = []
+
+                # Extract dependencies from chunks
+                for chunk in file_chunks:
+                    if chunk.dependencies:
+                        dependencies.extend(chunk.dependencies)
+
+                await self.update_service.update_file_record(
+                    file_path_str, content_hash, chunk_ids, list(set(dependencies))
+                )
+
+            # Phase 9: Dependency Graph Building
+            indexing_logger.log_info("Phase 9: Building dependency graph")
+            dependency_start = time.time()
+
+            # Build dependency graph for future incremental updates
+            await self.update_service.build_dependency_graph(str(codebase_path))
+
+            dependency_time = (time.time() - dependency_start) * 1000
+            indexing_logger.log_info("Dependency graph building complete", dependency_build_time_ms=dependency_time)
+
+            # Final Summary
+            processing_time = (time.time() - start_time) * 1000
+
+            indexing_logger.log_info(
+                "=== PROGRESS-BASED INDEXING SESSION SUMMARY ===",
+                total_processing_time_ms=processing_time,
+                files_processed=len(files_to_process),
+                chunks_created=len(all_chunks),
+                failed_files=len(failed_files),
+                languages_detected=list(languages_detected),
+            )
+
+            return IndexingResponse(
+                indexed_files=len(files_to_process),
+                total_chunks=len(all_chunks),
+                processing_time_ms=processing_time,
+                languages_detected=list(languages_detected),
+                status="success",
+            )
+
+        except Exception as e:
+            indexing_logger.log_error("Critical progress-based indexing failure", error=e)
+            raise
+        finally:
+            indexing_logger.close()
 
     async def _discover_source_files(
         self, codebase_path: Path, languages: list[str] | None, exclude_patterns: list[str]
@@ -289,9 +625,39 @@ class IndexingService:
         import fnmatch
 
         path_str = str(path)
+        relative_path = str(path.relative_to(path.anchor))
+
+        # Check user-provided exclude patterns
         for pattern in exclude_patterns:
-            if fnmatch.fnmatch(path_str, pattern):
+            if fnmatch.fnmatch(path_str, pattern) or fnmatch.fnmatch(relative_path, pattern):
                 return True
+
+        # Check against common patterns to exclude
+        common_excludes = [
+            "*.venv*",
+            "*/.venv/*",
+            "*/venv/*",
+            "*/env/*",
+            "*/__pycache__/*",
+            "*/.pytest_cache/*",
+            "*/.mypy_cache/*",
+            "*/.git/*",
+            "*/node_modules/*",
+            "*/.tox/*",
+            "*/.nox/*",
+            "*/build/*",
+            "*/dist/*",
+            "*/.coverage/*",
+            "*/htmlcov/*",
+            "*/.idea/*",
+            "*/.vscode/*",
+            "*/logs/*",
+        ]
+
+        for pattern in common_excludes:
+            if fnmatch.fnmatch(path_str, pattern) or fnmatch.fnmatch(relative_path, pattern):
+                return True
+
         return False
 
     async def _parse_file(self, file_path: Path) -> list[CodeChunk]:
@@ -596,165 +962,80 @@ class IndexingService:
         for child in node.children:
             await self._extract_chunks_from_node(child, content, file_path, language, chunks)
 
-    async def _store_index_metadata(self, codebase_path: Path, chunks: list[CodeChunk]) -> None:
-        """Store indexing metadata for incremental updates."""
-        metadata = {
-            "codebase_path": str(codebase_path),
-            "total_chunks": len(chunks),
-            "last_indexed": time.strftime("%Y-%m-%dT%H:%M:%S"),
-            "file_hashes": {},
-        }
-
-        # Calculate file hashes for incremental updates
-        for chunk in chunks:
-            file_path = Path(chunk.file_path)
-            if file_path.exists():
-                content = file_path.read_text(encoding="utf-8", errors="ignore")
-                file_hash = hashlib.sha256(content.encode()).hexdigest()
-                metadata["file_hashes"][str(file_path)] = file_hash
-
-        # Store metadata
-        metadata_path = self.config.INDEX_CACHE_DIR / "index_metadata.json"
-        with open(metadata_path, "w") as f:
-            json.dump(metadata, f, indent=2)
-        # Also update the update service file records for proper change detection
-        from datetime import datetime
-
-        for chunk in chunks:
-            file_path = Path(chunk.file_path)
-            if file_path.exists():
-                file_hash = metadata["file_hashes"].get(str(file_path))
-                if file_hash:
-                    # Generate chunk IDs for the file
-                    file_chunk_ids = [
-                        f"{file_path.name}:{chunk.start_line}-{chunk.end_line}"
-                        for chunk in chunks
-                        if chunk.file_path == str(file_path)
-                    ]
-                    record = FileUpdateRecord(
-                        file_path=str(file_path),
-                        content_hash=file_hash,
-                        last_indexed=datetime.now(),
-                        chunk_ids=file_chunk_ids,
-                        dependencies=[],  # Will be populated by dependency analysis
-                    )
-                    await self.update_service.store_file_record(record)
-
-    async def _update_index_metadata(
-        self, codebase_path: Path, updated_files: list[Path], deleted_files: list[Path]
-    ) -> None:
-        """Update index metadata for incremental indexing."""
-        metadata_path = self.config.INDEX_CACHE_DIR / "index_metadata.json"
-
-        # Load existing metadata or create new
-        if metadata_path.exists():
-            try:
-                with open(metadata_path) as f:
-                    metadata = json.load(f)
-            except Exception:
-                metadata = {"file_hashes": {}}
-        else:
-            metadata = {"codebase_path": str(codebase_path), "file_hashes": {}}
-
-        # Remove deleted files from metadata
-        for deleted_file in deleted_files:
-            metadata["file_hashes"].pop(str(deleted_file), None)
-
-        # Update hashes for modified/new files
-        for file_path in updated_files:
-            if file_path.exists():
-                try:
-                    content = file_path.read_text(encoding="utf-8", errors="ignore")
-                    file_hash = hashlib.sha256(content.encode()).hexdigest()
-                    metadata["file_hashes"][str(file_path)] = file_hash
-                except Exception as e:
-                    logger.warning(f"Error hashing file {file_path}: {e}")
-
-        # Update metadata timestamp and totals
-        metadata["last_indexed"] = time.strftime("%Y-%m-%dT%H:%M:%S")
-        metadata["total_chunks"] = len(metadata["file_hashes"])  # Approximate
-
-        # Save updated metadata
-        with open(metadata_path, "w") as f:
-            json.dump(metadata, f, indent=2)
-
     async def get_indexing_status(self, codebase_path: str) -> IndexingStatus:
         """Get current indexing status for a codebase."""
         validate_codebase_path(codebase_path)
-        metadata_path = self.config.INDEX_CACHE_DIR / "index_metadata.json"
-
-        if not metadata_path.exists():
-            return IndexingStatus(is_indexed=False, total_files=0, total_chunks=0, index_size_mb=0.0)
 
         try:
-            with open(metadata_path) as f:
-                metadata = json.load(f)
+            # Query vector database directly for status
+            from .search_service import SearchService
 
-            # Calculate index size
+            search_service = SearchService()
+            stats = await search_service.get_embeddings_stats()
+
+            # Calculate index size from actual database files
             index_size = sum(f.stat().st_size for f in self.config.INDEX_CACHE_DIR.iterdir() if f.is_file()) / (
                 1024 * 1024
             )  # Convert to MB
 
+            # Get unique file count from vector database
+            import sqlite3
+
+            conn = sqlite3.connect(str(self.config.VECTOR_DB_PATH))
+            try:
+                cursor = conn.execute("SELECT COUNT(DISTINCT file_path) FROM embeddings_vec_metadata")
+                total_files = cursor.fetchone()[0] or 0
+
+                # Get last indexed timestamp from newest record
+                cursor = conn.execute("SELECT MAX(created_at) FROM embeddings_vec_metadata")
+                last_indexed_result = cursor.fetchone()
+                last_indexed = last_indexed_result[0] if last_indexed_result and last_indexed_result[0] else None
+            except sqlite3.OperationalError:
+                # Table doesn't exist yet
+                total_files = 0
+                last_indexed = None
+            finally:
+                conn.close()
+
+            is_indexed = stats["total_embeddings"] > 0
+
             return IndexingStatus(
-                is_indexed=True,
-                last_indexed=metadata.get("last_indexed"),
-                total_files=len(metadata.get("file_hashes", {})),
-                total_chunks=metadata.get("total_chunks", 0),
+                is_indexed=is_indexed,
+                last_indexed=last_indexed,
+                total_files=total_files,
+                total_chunks=stats["total_embeddings"],
                 index_size_mb=round(index_size, 2),
             )
 
         except Exception as e:
-            logger.error(f"Error reading index metadata: {e}")
+            logger.error(f"Error getting indexing status: {e}")
             return IndexingStatus(is_indexed=False, total_files=0, total_chunks=0, index_size_mb=0.0)
 
     async def needs_reindexing(self, codebase_path: str) -> bool:
         """Check if codebase needs reindexing based on file changes or new files."""
-        metadata_path = self.config.INDEX_CACHE_DIR / "index_metadata.json"
-
-        if not metadata_path.exists():
-            return True
-
         try:
-            with open(metadata_path) as f:
-                metadata = json.load(f)
+            # Check if vector database has any data
+            import sqlite3
 
-            stored_hashes = metadata.get("file_hashes", {})
+            conn = sqlite3.connect(str(self.config.VECTOR_DB_PATH))
+            try:
+                cursor = conn.execute("SELECT COUNT(*) FROM embeddings_vec_metadata")
+                total_chunks = cursor.fetchone()[0] or 0
+            except sqlite3.OperationalError:
+                # Table doesn't exist yet, need initial indexing
+                total_chunks = 0
+            finally:
+                conn.close()
 
-            # Check if any tracked files have changed or been deleted
-            for file_path_str, stored_hash in stored_hashes.items():
-                file_path = Path(file_path_str)
-
-                if not file_path.exists():
-                    return True  # File was deleted
-
-                try:
-                    content = file_path.read_text(encoding="utf-8", errors="ignore")
-                    current_hash = hashlib.sha256(content.encode()).hexdigest()
-
-                    if current_hash != stored_hash:
-                        return True  # File was modified
-                except Exception:
-                    return True  # Error reading file
-
-            # Check for new untracked source files
-            codebase_path_obj = Path(codebase_path)
-            current_source_files = await self._discover_source_files(
-                codebase_path_obj,
-                languages=None,  # Auto-detect all languages
-                exclude_patterns=self.config.DEFAULT_EXCLUDE_PATTERNS,
-            )
-
-            # Convert to string paths for comparison
-            current_file_paths = {str(f) for f in current_source_files}
-            indexed_file_paths = set(stored_hashes.keys())
-
-            # If there are new source files not in the index, we need reindexing
-            new_files = current_file_paths - indexed_file_paths
-            if new_files:
-                logger.info(f"Found {len(new_files)} new untracked source files, reindexing needed")
+            # If no chunks exist, need initial indexing
+            if total_chunks == 0:
                 return True
 
-            return False
+            # Use update service to detect changes
+            modified_files, new_files, deleted_files = await self.update_service.detect_changes(codebase_path)
+
+            # Need reindexing if any files changed
+            return len(modified_files) + len(new_files) + len(deleted_files) > 0
 
         except Exception as e:
             logger.error(f"Error checking reindexing needs: {e}")

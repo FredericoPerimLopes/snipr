@@ -1,7 +1,8 @@
+import uuid
 from datetime import datetime
 from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class IndexingRequest(BaseModel):
@@ -37,6 +38,7 @@ class CodeChunk(BaseModel):
     language: str
     semantic_type: str  # function, class, variable, etc.
     embedding: list[float] | None = None
+    similarity: float | None = None
 
     # Enhanced scalability fields
     chunk_type: ChunkType | None = None
@@ -93,9 +95,55 @@ class IndexUpdateResult(BaseModel):
     processing_time: float
 
 
+class TaskStatus(Enum):
+    """Status of an indexing task."""
+
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class IndexingTaskProgress(BaseModel):
+    """Progress information for an indexing task."""
+
+    model_config = ConfigDict(json_encoders={datetime: lambda v: v.isoformat()})
+
+    files_processed: int = 0
+    total_files: int = 0
+    current_file: str | None = None
+    chunks_created: int = 0
+    start_time: datetime = Field(default_factory=datetime.now)
+    estimated_completion: datetime | None = None
+
+    @property
+    def progress_percentage(self) -> float:
+        """Calculate progress as percentage."""
+        if self.total_files == 0:
+            return 0.0
+        return (self.files_processed / self.total_files) * 100
+
+
+class IndexingTask(BaseModel):
+    """Model for tracking async indexing operations."""
+
+    model_config = ConfigDict(json_encoders={datetime: lambda v: v.isoformat()})
+
+    task_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    codebase_path: str
+    status: TaskStatus = TaskStatus.PENDING
+    progress: IndexingTaskProgress = Field(default_factory=IndexingTaskProgress)
+    result: IndexingResponse | None = None
+    error_message: str | None = None
+    created_at: datetime = Field(default_factory=datetime.now)
+    completed_at: datetime | None = None
+
+
 class IndexingStatus(BaseModel):
     is_indexed: bool
     last_indexed: str | None = None
     total_files: int
     total_chunks: int
     index_size_mb: float
+    active_task: IndexingTask | None = None

@@ -37,8 +37,15 @@ async def search_code(
         JSON string with search results and metadata
     """
     try:
+        logger.info(f"Starting search for query: '{query}'")
+        logger.info(
+            f"Search parameters: language={language}, max_results={max_results}, "
+            f"similarity_threshold={similarity_threshold}"
+        )
+
         # Auto-sync index if requested and codebase path provided
         if auto_sync and codebase_path:
+            logger.info(f"Checking if index sync needed for: {codebase_path}")
             from ..models.indexing_models import IndexingRequest
             from ..services.indexing_service import IndexingService
 
@@ -47,8 +54,11 @@ async def search_code(
                 logger.info("Changes detected, syncing index before search...")
                 sync_request = IndexingRequest(codebase_path=codebase_path)
                 await indexing_service.index_codebase(sync_request)
+            else:
+                logger.info("Index is up to date, skipping sync")
 
         # Validate and create search request
+        logger.info("Creating search request")
         request = SearchRequest(
             query=query,
             language=language,
@@ -57,8 +67,10 @@ async def search_code(
         )
 
         # Perform hybrid search
-        logger.info(f"Searching for: '{query}' (language: {language or 'any'})")
+        logger.info(f"Performing hybrid search for: '{query}' (language: {language or 'any'})")
+        logger.info("Initializing hybrid search service...")
         search_result = await hybrid_search_service.search(request)
+        logger.info(f"Hybrid search completed, got {search_result.total_matches} results")
 
         # Prepare response with additional metadata
         response = {
