@@ -176,13 +176,13 @@ class TestIndexingService:
         """Test getting status when no index exists."""
         # Create fresh IndexingService with isolated config and mocked SearchService
         from unittest.mock import AsyncMock
-        
+
         with (
             patch("src.services.indexing_service.get_settings") as mock_settings,
             patch("src.services.search_service.SearchService") as mock_search_class,
         ):
             mock_settings.return_value = mock_config
-            
+
             # Mock SearchService to return empty stats
             mock_search_service = AsyncMock()
             mock_search_service.get_embeddings_stats = AsyncMock(return_value={
@@ -192,7 +192,7 @@ class TestIndexingService:
                 "database_size_mb": 0
             })
             mock_search_class.return_value = mock_search_service
-            
+
             fresh_service = IndexingService()
             status = await fresh_service.get_indexing_status(str(temp_codebase))
 
