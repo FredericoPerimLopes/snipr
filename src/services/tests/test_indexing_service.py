@@ -185,12 +185,9 @@ class TestIndexingService:
 
             # Mock SearchService to return empty stats
             mock_search_service = AsyncMock()
-            mock_search_service.get_embeddings_stats = AsyncMock(return_value={
-                "total_embeddings": 0,
-                "languages": {},
-                "semantic_types": {},
-                "database_size_mb": 0
-            })
+            mock_search_service.get_embeddings_stats = AsyncMock(
+                return_value={"total_embeddings": 0, "languages": {}, "semantic_types": {}, "database_size_mb": 0}
+            )
             mock_search_class.return_value = mock_search_service
 
             fresh_service = IndexingService()
