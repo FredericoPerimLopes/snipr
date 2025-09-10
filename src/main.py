@@ -38,13 +38,21 @@ app = FastMCP("Code Indexer")
 @app.tool()
 async def index_codebase_tool(codebase_path: str, languages: str = None, exclude_patterns: str = None) -> str:
     """Index a codebase for semantic search."""
-    return await index_codebase(codebase_path, languages, exclude_patterns)
+    logger.info(f"index_codebase_tool called: path={codebase_path}, languages={languages}, exclude={exclude_patterns}")
+    result = await index_codebase(codebase_path, languages, exclude_patterns)
+    result_preview = result[:200] + "..." if len(result) > 200 else result
+    logger.info(f"index_codebase_tool result: {result_preview}")
+    return result
 
 
 @app.tool()
 async def get_indexing_status_tool(codebase_path: str) -> str:
     """Get current indexing status for a codebase."""
-    return await get_indexing_status(codebase_path)
+    logger.info(f"get_indexing_status_tool called: path={codebase_path}")
+    result = await get_indexing_status(codebase_path)
+    result_preview = result[:200] + "..." if len(result) > 200 else result
+    logger.info(f"get_indexing_status_tool result: {result_preview}")
+    return result
 
 
 @app.tool()
