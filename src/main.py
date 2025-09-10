@@ -40,7 +40,8 @@ async def index_codebase_tool(codebase_path: str, languages: str = None, exclude
     """Index a codebase for semantic search."""
     logger.info(f"index_codebase_tool called: path={codebase_path}, languages={languages}, exclude={exclude_patterns}")
     result = await index_codebase(codebase_path, languages, exclude_patterns)
-    logger.info(f"index_codebase_tool result: {result[:200]}..." if len(result) > 200 else f"index_codebase_tool result: {result}")
+    result_preview = result[:200] + "..." if len(result) > 200 else result
+    logger.info(f"index_codebase_tool result: {result_preview}")
     return result
 
 
@@ -49,7 +50,8 @@ async def get_indexing_status_tool(codebase_path: str) -> str:
     """Get current indexing status for a codebase."""
     logger.info(f"get_indexing_status_tool called: path={codebase_path}")
     result = await get_indexing_status(codebase_path)
-    logger.info(f"get_indexing_status_tool result: {result[:200]}..." if len(result) > 200 else f"get_indexing_status_tool result: {result}")
+    result_preview = result[:200] + "..." if len(result) > 200 else result
+    logger.info(f"get_indexing_status_tool result: {result_preview}")
     return result
 
 
